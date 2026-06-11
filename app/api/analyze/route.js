@@ -5,43 +5,52 @@ const client = new OpenAI({
 });
 
 export async function POST(req) {
-  try {
-    const { images } = await req.json();
+  const { images } = await req.json();
 
-    const content = [
+  const response = await client.responses.create({
+    model: "gpt-5.4-nano",
+    input: [
       {
-        type: "input_text",
-        text: `
-Eres nutricionista experto en diabetes tipo 1.
+        role: "user",
+        content: [
+          {
+            type: "input_text",
+            text: `
+Eres experto en nutrición para diabetes tipo 1.
 
-Analiza TODAS las imágenes.
-
-Devuelve JSON con:
-- nombre
-- cantidad (gramos)
-- unidad
+Analiza la comida.
 
 IMPORTANTE:
-- Sé conservador
-- Si hay varias fotos, mejora la precisión
+- Devuelve piezas si aplica (sushi, pan, etc)
+- Estima gramos por pieza
+- Si no aplica, usa gramos directamente
+
+Formato:
+
+[
+  {
+    "nombre": "sushi maki",
+    "piezas": 8,
+    "gramos_por_pieza": 30,
+    "confianza": 0.9
+  }
+]
 `
-      },
-      ...images.map(img => ({
-        type: "input_image",
-        image_url: img
-      }))
-    ];
+          },
+          ...images.map(img => ({
+            type: "input_image",
+            image_url: img
+          }))
+        ]
+      }
+    ]
+  });
 
-    const response = await client.responses.create({
-      model: "gpt-5.4-nano",
-      input: [{ role: "user", content }]
-    });
+  const text = response.output_text;
 
-    return new Response(JSON.stringify(JSON.parse(response.output_text)), {
-      status: 200
-    });
-
-  } catch (e) {
-    return new Response(JSON.stringify([]), { status: 200 });
+  try {
+    return new Response(text, { status: 200 });
+  } catch {
+    return new Response("[]");
   }
 }
