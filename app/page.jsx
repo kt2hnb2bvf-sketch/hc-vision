@@ -49,6 +49,8 @@ export default function App() {
         📸 Subir comida
         <input
           type="file"
+          accept="image/*"
+          capture="environment"
           onChange={handleUpload}
           style={{ display: "none" }}
         />
