@@ -10,7 +10,6 @@ export async function POST(req) {
 
     const response = await client.responses.create({
       model: "gpt-5.4-nano",
-      max_output_tokens: 800,
       input: [
         {
           role: "user",
@@ -26,10 +25,18 @@ Tu tarea es SOLO identificar alimentos y estimar cantidades.
 
 Para cada alimento devuelve:
 
-- nombre
-- cantidad
+- nombre (lo más específico posible)
+- cantidad estimada (número)
 - unidad ("gramos" o "unidades")
-- confianza (0 a 1)
+- confianza (número entre 0 y 1)
+
+IMPORTANTE:
+- NO calcules hidratos de carbono
+- NO calcules índice glucémico
+- NO inventes datos nutricionales
+- Sé conservador con las cantidades
+- Si dudas entre alimentos (ej: pan vs salchicha), elige el más probable
+- Si hay varios alimentos, sepáralos
 
 RESPONDE SOLO JSON:
 
@@ -45,14 +52,14 @@ RESPONDE SOLO JSON:
             },
             {
               type: "input_image",
-              image_url: imageBase64
+              image_url: `data:image/jpeg;base64,${imageBase64}`
             }
           ]
         }
       ]
     });
 
-    const text = response.output_text;
+    const text = response.output[0].content[0].text;
 
     let json;
 
