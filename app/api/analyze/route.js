@@ -1,43 +1,78 @@
+import OpenAI from "openai";
+
+const client = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
+
 export async function POST(req) {
   try {
     const { images } = await req.json();
 
-    const content = images.map(img => ({
-      type: "image",
-      source: {
-        type: "base64",
-        media_type: "image/jpeg",
-        data: img.split(",")[1]
+    if (!images || images.length === 0) {
+      return new Response(JSON.stringify({ items: [] }), { status: 400 });
+    }
+
+    // 🔥 convertir imágenes a formato correcto
+    const content = [
+      {
+        type: "input_text",
+        text: `
+Analiza estas imágenes del plato.
+
+Devuelve SOLO JSON:
+
+{
+  "items":[
+    {
+      "name":"alimento",
+      "grams":100,
+      "hc_per_100g":20,
+      "units":{
+        "label":"makis",
+        "grams_per_unit":20,
+        "default_count":5
       }
-    }));
+    }
+  ]
+}
 
-    content.push({
-      type: "text",
-      text: "Devuelve alimentos con gramos, hc_per_100g y units"
-    });
-
-    const response = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": process.env.ANTHROPIC_API_KEY,
-        "anthropic-version": "2023-06-01"
+- No expliques nada
+- No texto fuera del JSON
+`
       },
-      body: JSON.stringify({
-        model: "claude-3-sonnet-20240229",
-        max_tokens: 1000,
-        messages: [{ role: "user", content }]
-      })
+
+      ...images.map((img) => ({
+        type: "input_image",
+        image_url: img
+      }))
+    ];
+
+    const response = await client.responses.create({
+      model: "gpt-5.4-nano",
+      input: [
+        {
+          role: "user",
+          content
+        }
+      ],
+      max_output_tokens: 800
     });
 
-    const data = await response.json();
+    const text = response.output_text;
 
-    let text = data.content?.[0]?.text || "{}";
-    text = text.replace(/```json|```/g, "").trim();
+    let json;
 
-    return new Response(text);
+    try {
+      json = JSON.parse(text);
+    } catch (e) {
+      console.error("JSON ERROR:", text);
+      return new Response(JSON.stringify({ items: [] }));
+    }
 
-  } catch {
-    return new Response(JSON.stringify({ error: "error IA" }), { status: 500 });
+    return new Response(JSON.stringify(json));
+
+  } catch (error) {
+    console.error(error);
+    return new Response(JSON.stringify({ items: [] }), { status: 500 });
   }
 }
