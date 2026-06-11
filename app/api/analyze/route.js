@@ -24,12 +24,7 @@ Devuelve JSON:
   name:"",
   grams:0,
   hc_per_100g:0,
-  gi:0,
-  units:{
-    label:"",
-    grams_per_unit:0,
-    default_count:0
-  }
+  gi:0
  }]
 }
 `
@@ -45,11 +40,9 @@ Devuelve JSON:
       input: [{ role: "user", content }]
     });
 
-    const text = response.output_text;
+    return new Response(response.output_text);
 
-    return new Response(text);
-
-  } catch {
+  } catch (e) {
     return new Response(JSON.stringify({ items: [] }));
   }
 }

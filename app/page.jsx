@@ -26,25 +26,22 @@ export default function App() {
     return "#34C759";
   };
 
-  // 🔥 BOLO INTELIGENTE REAL
   const getBoloStrategy = (gi, name, insulin) => {
 
     const lower = name.toLowerCase();
 
     if (lower.includes("sushi") || lower.includes("maki")) {
       return {
-        type: "mixto",
         total: insulin,
         now: insulin * 0.7,
         extended: insulin * 0.3,
         time: "1–2h",
-        advice: "Prebolo 10–15 min + parte extendida"
+        advice: "Prebolo 10–15 min + extendido"
       };
     }
 
     if (gi >= 70) {
       return {
-        type: "rápido",
         total: insulin,
         now: insulin,
         extended: 0,
@@ -55,7 +52,6 @@ export default function App() {
 
     if (gi >= 56) {
       return {
-        type: "mixto",
         total: insulin,
         now: insulin * 0.7,
         extended: insulin * 0.3,
@@ -65,12 +61,11 @@ export default function App() {
     }
 
     return {
-      type: "lento",
       total: insulin,
       now: insulin * 0.5,
       extended: insulin * 0.5,
       time: "2–3h",
-      advice: "Bolo extendido recomendado"
+      advice: "Bolo extendido"
     };
   };
 
@@ -153,7 +148,6 @@ export default function App() {
           });
 
           const json = await res.json();
-
           setData(json.items || []);
 
         }}
@@ -186,7 +180,6 @@ export default function App() {
 
             <p>{item.name}</p>
 
-            {/* SEMÁFORO */}
             <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
               <div style={{
                 width: 10,
@@ -199,9 +192,7 @@ export default function App() {
 
             <p>HC: {carbs.toFixed(1)} g</p>
 
-            {/* 💉 BOLO COMPLETO */}
             <p>💉 Total: {bolo.total.toFixed(1)} u</p>
-
             <p>➡️ Ahora: {bolo.now.toFixed(1)} u</p>
 
             {bolo.extended > 0 && (
@@ -216,7 +207,6 @@ export default function App() {
         );
       })}
 
-      {/* DISCLAIMER */}
       <p style={{ fontSize: 12, color: "gray", marginTop: 12 }}>
         ⚠️ Orientativo — consulta siempre con tu especialista
       </p>
