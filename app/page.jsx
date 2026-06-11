@@ -1,11 +1,34 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 export default function App() {
   const [resultado, setResultado] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [modoNoche, setModoNoche] = useState(false);
+  const [historial, setHistorial] = useState([]);
 
+  // 🔥 Cargar historial guardado
+  useEffect(() => {
+    const saved = localStorage.getItem("historial");
+    if (saved) setHistorial(JSON.parse(saved));
+  }, []);
+
+  // 🔥 Guardar historial
+  const guardarComida = (data) => {
+    const nuevo = [...historial, { fecha: new Date(), data }];
+    setHistorial(nuevo);
+    localStorage.setItem("historial", JSON.stringify(nuevo));
+  };
+
+  // 🔥 SEMÁFORO
+  const getColor = (hc) => {
+    if (hc < 20) return "green";
+    if (hc < 50) return "orange";
+    return "red";
+  };
+
+  // 🔥 SUBIR IMÁGENES
   const handleUpload = async (e) => {
     const files = Array.from(e.target.files);
     if (!files.length) return;
@@ -31,23 +54,43 @@ export default function App() {
     });
 
     const data = await res.json();
-    setResultado(data);
+
+    // 🔥 AÑADIMOS HC + INSULINA
+    const enriquecido = data.map(item => {
+      const hc = item.cantidad * 0.3; // estimación simple
+      const insulina = hc / 10;
+
+      return {
+        ...item,
+        hc,
+        insulina
+      };
+    });
+
+    setResultado(enriquecido);
+    guardarComida(enriquecido);
     setLoading(false);
   };
 
   return (
     <div style={{
       minHeight: "100vh",
-      background: "#f5f7fb",
-      padding: "30px",
+      background: modoNoche ? "#1a1a1a" : "#f5f7fb",
+      color: modoNoche ? "white" : "black",
+      padding: 30,
       fontFamily: "system-ui"
     }}>
       
-      <h1 style={{ fontSize: "32px", marginBottom: "20px" }}>
-        🍽️ HC Vision
-      </h1>
+      {/* HEADER */}
+      <div style={{ display: "flex", justifyContent: "space-between" }}>
+        <h1>🍽️ HC Vision</h1>
 
-      {/* BOTÓN BONITO */}
+        <button onClick={() => setModoNoche(!modoNoche)}>
+          {modoNoche ? "☀️ Día" : "🌙 Noche"}
+        </button>
+      </div>
+
+      {/* BOTÓN */}
       <label style={{
         display: "inline-block",
         padding: "14px 20px",
@@ -55,7 +98,8 @@ export default function App() {
         color: "white",
         borderRadius: "10px",
         cursor: "pointer",
-        fontWeight: "bold"
+        fontWeight: "bold",
+        marginTop: 20
       }}>
         📸 Subir o hacer foto
 
@@ -69,37 +113,64 @@ export default function App() {
         />
       </label>
 
-      {/* LOADING */}
-      {loading && (
-        <p style={{ marginTop: 20 }}>🔍 Analizando plato...</p>
-      )}
+      {loading && <p>🔍 Analizando...</p>}
 
-      {/* RESULTADOS BONITOS */}
+      {/* RESULTADOS */}
       {resultado && (
         <div style={{ marginTop: 30 }}>
           <h2>Resultados:</h2>
 
           {resultado.map((item, i) => (
             <div key={i} style={{
-              background: "white",
-              padding: "15px",
-              marginTop: "10px",
-              borderRadius: "12px",
+              background: modoNoche ? "#2a2a2a" : "white",
+              padding: 15,
+              marginTop: 10,
+              borderRadius: 12,
               boxShadow: "0 4px 10px rgba(0,0,0,0.05)"
             }}>
               <strong>{item.nombre}</strong>
 
-              <p>
-                {item.cantidad} {item.unidad}
-              </p>
+              <p>{item.cantidad} {item.unidad}</p>
 
-              <p>
-                Confianza: {Math.round(item.confianza * 100)}%
-              </p>
+              <p>HC: {item.hc.toFixed(1)} g</p>
+
+              {/* 🔴🟡🟢 SEMÁFORO */}
+              <div style={{
+                width: 15,
+                height: 15,
+                borderRadius: "50%",
+                background: getColor(item.hc)
+              }} />
+
+              <p>💉 Insulina estimada: {item.insulina.toFixed(1)} u</p>
+
+              {/* 🔁 BOTÓN REANALIZAR */}
+              <button
+                style={{ marginTop: 10 }}
+                onClick={() => alert("Reanaliza subiendo otra foto")}
+              >
+                🔄 Verificar alimento
+              </button>
             </div>
           ))}
         </div>
       )}
+
+      {/* HISTORIAL */}
+      <div style={{ marginTop: 40 }}>
+        <h2>📊 Historial</h2>
+
+        {historial.map((item, i) => (
+          <div key={i} style={{
+            marginTop: 10,
+            padding: 10,
+            background: modoNoche ? "#2a2a2a" : "#eee",
+            borderRadius: 10
+          }}>
+            {new Date(item.fecha).toLocaleString()}
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
