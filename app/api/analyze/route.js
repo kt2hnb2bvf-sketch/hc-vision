@@ -1,60 +1,47 @@
 import OpenAI from "openai";
 
+const client = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY
+});
+
 export async function POST(req) {
   try {
-    const client = new OpenAI({
-      apiKey: process.env.OPENAI_API_KEY,
-    });
-
     const { images } = await req.json();
 
-    const response = await client.responses.create({
-      model: "gpt-4.1-mini",
-      input: [
-        {
-          role: "user",
-          content: [
-            {
-              type: "input_text",
-              text: `
-Eres experto en nutrición.
+    const content = [
+      {
+        type: "input_text",
+        text: `
+Eres nutricionista experto en diabetes tipo 1.
 
-Analiza imágenes de comida.
+Analiza TODAS las imágenes.
 
-Devuelve SOLO JSON:
+Devuelve JSON con:
+- nombre
+- cantidad (gramos)
+- unidad
 
-[
-  {
-    "nombre": "arroz",
-    "cantidad": 200,
-    "unidad": "gramos",
-    "confianza": 0.9
-  }
-]
+IMPORTANTE:
+- Sé conservador
+- Si hay varias fotos, mejora la precisión
 `
-            },
-            ...images.map(img => ({
-              type: "input_image",
-              image_url: img
-            }))
-          ]
-        }
-      ]
+      },
+      ...images.map(img => ({
+        type: "input_image",
+        image_url: img
+      }))
+    ];
+
+    const response = await client.responses.create({
+      model: "gpt-5.4-nano",
+      input: [{ role: "user", content }]
     });
 
-    const text = response.output_text;
+    return new Response(JSON.stringify(JSON.parse(response.output_text)), {
+      status: 200
+    });
 
-    let json;
-
-    try {
-      json = JSON.parse(text);
-    } catch {
-      return new Response(JSON.stringify([]), { status: 200 });
-    }
-
-    return new Response(JSON.stringify(json), { status: 200 });
-
-  } catch (error) {
-    return new Response(JSON.stringify({ error: "error" }), { status: 500 });
+  } catch (e) {
+    return new Response(JSON.stringify([]), { status: 200 });
   }
 }

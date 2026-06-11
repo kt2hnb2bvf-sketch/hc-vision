@@ -3,32 +3,62 @@
 import { useState, useEffect } from "react";
 
 export default function App() {
+  const [images, setImages] = useState([]);
   const [resultado, setResultado] = useState([]);
-  const [diario, setDiario] = useState([]);
-  const [comidaSeleccionada, setComidaSeleccionada] = useState("comida");
+  const [historial, setHistorial] = useState([]);
+  const [aprendizaje, setAprendizaje] = useState({});
+  const [mealType, setMealType] = useState("comida");
 
-  const [ratio, setRatio] = useState(10); // g HC por unidad
-  const [glucosa, setGlucosa] = useState(100);
-  const objetivo = 100;
-  const factorSensibilidad = 50;
+  const [ratio, setRatio] = useState(10);
 
-  // 🔥 CARGAR HISTORIAL
   useEffect(() => {
-    const data = localStorage.getItem("diario");
-    if (data) setDiario(JSON.parse(data));
+    const saved = localStorage.getItem("historial");
+    const learn = localStorage.getItem("aprendizaje");
+
+    if (saved) setHistorial(JSON.parse(saved));
+    if (learn) setAprendizaje(JSON.parse(learn));
   }, []);
 
-  // 🔥 GUARDAR HISTORIAL
-  useEffect(() => {
-    localStorage.setItem("diario", JSON.stringify(diario));
-  }, [diario]);
+  // 🧠 HC por alimento
+  const calcularHC = (nombre, gramos) => {
+    const n = nombre.toLowerCase();
 
+    if (n.includes("arroz") || n.includes("sushi")) return gramos * 0.30;
+    if (n.includes("pan")) return gramos * 0.50;
+    if (n.includes("pasta")) return gramos * 0.25;
+
+    return gramos * 0.15;
+  };
+
+  // 🚦 semáforo
+  const semaforo = (hc) => {
+    if (hc < 10) return "🟢";
+    if (hc < 30) return "🟡";
+    return "🔴";
+  };
+
+  // 🧠 recomendaciones médicas
+  const infoClinica = (nombre) => {
+    const n = nombre.toLowerCase();
+
+    if (n.includes("sushi") || n.includes("arroz")) {
+      return "⚠️ IG alto → haz prebolo 10-15 min antes";
+    }
+
+    if (n.includes("pizza") || n.includes("pasta")) {
+      return "🍕 absorción lenta → bolo extendido";
+    }
+
+    return "🟢 impacto bajo";
+  };
+
+  // 📷 subir imágenes
   const handleUpload = async (e) => {
     const files = Array.from(e.target.files);
 
     const base64Images = await Promise.all(
-      files.map((file) => {
-        return new Promise((resolve) => {
+      files.map(file => {
+        return new Promise(resolve => {
           const reader = new FileReader();
           reader.onloadend = () => resolve(reader.result);
           reader.readAsDataURL(file);
@@ -38,195 +68,171 @@ export default function App() {
 
     const res = await fetch("/api/analyze", {
       method: "POST",
-      body: JSON.stringify({ images: base64Images }),
+      body: JSON.stringify({ images: base64Images })
     });
 
-    const data = await res.json();
+    let data = await res.json();
 
-    const enriched = data.map((item) => ({
-      ...item,
-      gramos: item.unidad === "gramos" ? item.cantidad : 0,
-      piezas: item.unidad === "unidades" ? item.cantidad : 0,
-    }));
+    // 🧠 aplicar aprendizaje
+    data = data.map(item => {
+      const key = item.nombre.toLowerCase();
+      if (aprendizaje[key]) {
+        return { ...item, cantidad: aprendizaje[key] };
+      }
+      return item;
+    });
 
-    setResultado(enriched);
+    setResultado(data);
   };
 
-  const calcularHC = (nombre, gramos) => {
-    if (nombre.includes("arroz")) return gramos * 0.3;
-    if (nombre.includes("pan")) return gramos * 0.5;
-    if (nombre.includes("pasta")) return gramos * 0.25;
-    return gramos * 0.15;
+  // 🔧 slider gramos
+  const ajustarGramos = (i, gramos) => {
+    const copia = [...resultado];
+    copia[i].cantidad = Number(gramos);
+    setResultado(copia);
   };
 
-  const calcularInsulina = (hc) => {
-    const boloHC = hc / ratio;
-    const correccion = (glucosa - objetivo) / factorSensibilidad;
-    return Math.max(0, boloHC + correccion).toFixed(1);
-  };
-
-  const actualizarGramos = (i, gramos) => {
-    const nuevo = [...resultado];
-    nuevo[i].gramos = gramos;
-    setResultado(nuevo);
-  };
-
-  const actualizarPiezas = (i, piezas) => {
-    const nuevo = [...resultado];
-    nuevo[i].piezas = piezas;
-    nuevo[i].gramos = piezas * 35;
-    setResultado(nuevo);
-  };
-
-  const guardarComida = () => {
-    const comida = {
+  // 💾 guardar comida + aprendizaje
+  const guardar = () => {
+    const nueva = {
+      tipo: mealType,
       fecha: new Date().toLocaleString(),
-      tipo: comidaSeleccionada,
-      items: resultado,
-      glucosa,
+      data: resultado
     };
 
-    setDiario([comida, ...diario]);
-    setResultado([]);
+    const nuevoHist = [nueva, ...historial];
+
+    setHistorial(nuevoHist);
+    localStorage.setItem("historial", JSON.stringify(nuevoHist));
+
+    const nuevoApr = { ...aprendizaje };
+
+    resultado.forEach(r => {
+      nuevoApr[r.nombre.toLowerCase()] = r.cantidad;
+    });
+
+    setAprendizaje(nuevoApr);
+    localStorage.setItem("aprendizaje", JSON.stringify(nuevoApr));
+
+    alert("✅ guardado y aprendido");
   };
 
-  const comidas = [
-    { key: "desayuno", label: "🍳 Desayuno" },
-    { key: "comida", label: "🍽️ Comida" },
-    { key: "merienda", label: "☕ Merienda" },
-    { key: "cena", label: "🌙 Cena" },
-  ];
-
   return (
-    <div style={{ padding: 20, fontFamily: "Arial", background: "#f5f5f5" }}>
-      <h1>🍽️ HC Vision PRO+</h1>
+    <div style={{ fontFamily: "system-ui", padding: 20, maxWidth: 500, margin: "auto" }}>
 
-      {/* ⚙️ CONFIGURACIÓN */}
+      <h1 style={{ fontSize: 28 }}>🍽️ HC Vision PRO+</h1>
+
+      {/* ⚙️ ajustes */}
       <div style={{ marginBottom: 20 }}>
-        <h3>⚙️ Ajustes</h3>
-
-        <p>Ratio insulina (g HC / unidad):</p>
-        <input
-          type="number"
-          value={ratio}
-          onChange={(e) => setRatio(Number(e.target.value))}
-        />
-
-        <p>Glucosa actual (mg/dL):</p>
-        <input
-          type="number"
-          value={glucosa}
-          onChange={(e) => setGlucosa(Number(e.target.value))}
-        />
+        <p>Ratio insulina</p>
+        <input value={ratio} onChange={e => setRatio(e.target.value)} />
       </div>
 
-      {/* 🍽️ SELECCIÓN COMIDA */}
-      <div style={{ display: "flex", gap: 10 }}>
-        {comidas.map((c) => (
+      {/* 🍽️ selector comidas */}
+      <div style={{ display: "flex", gap: 10, marginBottom: 20 }}>
+        {["desayuno", "comida", "merienda", "cena"].map(t => (
           <button
-            key={c.key}
-            onClick={() => setComidaSeleccionada(c.key)}
+            key={t}
+            onClick={() => setMealType(t)}
             style={{
+              flex: 1,
               padding: 10,
-              background: comidaSeleccionada === c.key ? "#0070f3" : "#ccc",
-              color: "white",
+              borderRadius: 20,
               border: "none",
-              borderRadius: 8,
+              background: mealType === t ? "#007AFF" : "#eee",
+              color: mealType === t ? "white" : "black"
             }}
           >
-            {c.label}
+            {t}
           </button>
         ))}
       </div>
 
-      {/* 📷 FOTO */}
-      <input
-        type="file"
-        multiple
-        accept="image/*"
-        capture="environment"
-        onChange={handleUpload}
-        style={{ marginTop: 20 }}
-      />
+      {/* 📷 botón iPhone */}
+      <label
+        style={{
+          display: "block",
+          padding: 20,
+          borderRadius: 20,
+          background: "#007AFF",
+          color: "white",
+          textAlign: "center",
+          marginBottom: 20,
+          cursor: "pointer"
+        }}
+      >
+        📷 Subir o hacer foto
+        <input
+          type="file"
+          accept="image/*"
+          capture="environment"
+          multiple
+          hidden
+          onChange={handleUpload}
+        />
+      </label>
 
-      {/* RESULTADOS */}
-      <h2>Resultados</h2>
-
+      {/* resultados */}
       {resultado.map((item, i) => {
-        const hc = calcularHC(item.nombre, item.gramos);
-        const insulina = calcularInsulina(hc);
-        const esMaki = item.nombre.includes("maki");
+        const hc = calcularHC(item.nombre, item.cantidad);
+        const insulina = hc / ratio;
 
         return (
-          <div key={i} style={{
-            background: "white",
-            padding: 15,
-            marginTop: 10,
-            borderRadius: 10
-          }}>
-            <strong>{item.nombre}</strong>
+          <div
+            key={i}
+            style={{
+              background: "white",
+              padding: 15,
+              borderRadius: 20,
+              marginBottom: 15,
+              boxShadow: "0 4px 10px rgba(0,0,0,0.1)"
+            }}
+          >
+            <h3>{item.nombre}</h3>
 
-            {esMaki && (
-              <>
-                <p>Piezas:</p>
-                <input
-                  type="number"
-                  value={item.piezas}
-                  onChange={(e) =>
-                    actualizarPiezas(i, Number(e.target.value))
-                  }
-                />
-              </>
-            )}
-
-            <p>Gramos: {item.gramos}</p>
             <input
               type="range"
               min="0"
               max="400"
-              value={item.gramos}
-              onChange={(e) =>
-                actualizarGramos(i, Number(e.target.value))
-              }
+              value={item.cantidad}
+              onChange={(e) => ajustarGramos(i, e.target.value)}
               style={{ width: "100%" }}
             />
 
-            <p>HC: {hc.toFixed(1)} g</p>
-            <p>💉 Insulina recomendada: {insulina} u</p>
+            <p>{item.cantidad} g</p>
+            <p>{semaforo(hc)} HC: {hc.toFixed(1)} g</p>
+            <p>💉 {insulina.toFixed(1)} u</p>
+            <p style={{ fontSize: 12 }}>{infoClinica(item.nombre)}</p>
           </div>
         );
       })}
 
       {resultado.length > 0 && (
         <button
-          onClick={guardarComida}
+          onClick={guardar}
           style={{
-            marginTop: 20,
+            width: "100%",
             padding: 15,
+            borderRadius: 20,
             background: "green",
             color: "white",
             border: "none",
-            borderRadius: 10,
+            marginBottom: 20
           }}
         >
-          ✅ Guardar comida
+          Guardar comida
         </button>
       )}
 
-      {/* 📅 HISTORIAL */}
-      <h2 style={{ marginTop: 30 }}>📅 Historial</h2>
+      {/* historial */}
+      <h3>📊 Historial</h3>
 
-      {diario.map((d, i) => (
-        <div key={i} style={{
-          background: "#ddd",
-          padding: 10,
-          marginTop: 10,
-          borderRadius: 8
-        }}>
-          <strong>{d.tipo.toUpperCase()}</strong> — {d.fecha}
-          <p>Glucosa: {d.glucosa} mg/dL</p>
+      {historial.map((h, i) => (
+        <div key={i} style={{ fontSize: 12, marginBottom: 10 }}>
+          {h.tipo} - {h.fecha}
         </div>
       ))}
+
     </div>
   );
 }
