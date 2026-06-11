@@ -7,7 +7,6 @@ export default function App() {
   const [photos, setPhotos] = useState([]);
   const [data, setData] = useState([]);
   const [showPicker, setShowPicker] = useState(false);
-  const [loading, setLoading] = useState(false);
 
   const ratio = 10;
 
@@ -25,6 +24,54 @@ export default function App() {
     if (gi >= 70) return "#FF3B30";
     if (gi >= 56) return "#FF9500";
     return "#34C759";
+  };
+
+  // 🔥 BOLO INTELIGENTE REAL
+  const getBoloStrategy = (gi, name, insulin) => {
+
+    const lower = name.toLowerCase();
+
+    if (lower.includes("sushi") || lower.includes("maki")) {
+      return {
+        type: "mixto",
+        total: insulin,
+        now: insulin * 0.7,
+        extended: insulin * 0.3,
+        time: "1–2h",
+        advice: "Prebolo 10–15 min + parte extendida"
+      };
+    }
+
+    if (gi >= 70) {
+      return {
+        type: "rápido",
+        total: insulin,
+        now: insulin,
+        extended: 0,
+        time: null,
+        advice: "Prebolo 10–15 min"
+      };
+    }
+
+    if (gi >= 56) {
+      return {
+        type: "mixto",
+        total: insulin,
+        now: insulin * 0.7,
+        extended: insulin * 0.3,
+        time: "1–2h",
+        advice: "Dividir bolo"
+      };
+    }
+
+    return {
+      type: "lento",
+      total: insulin,
+      now: insulin * 0.5,
+      extended: insulin * 0.5,
+      time: "2–3h",
+      advice: "Bolo extendido recomendado"
+    };
   };
 
   const handleFiles = (files) => {
@@ -50,11 +97,10 @@ export default function App() {
 
   return (
     <div style={{
-      fontFamily: "-apple-system",
+      fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif",
       background: "#F2F2F7",
       minHeight: "100vh",
-      padding: 16,
-      paddingBottom: 90
+      padding: 16
     }}>
 
       {/* HEADER */}
@@ -74,44 +120,23 @@ export default function App() {
       <div style={{
         background: "white",
         borderRadius: 14,
-        padding: 16,
-        border: "0.5px solid rgba(60,60,67,0.18)"
+        padding: 20,
+        marginTop: 10
       }}>
-
-        <p style={{ fontSize: 12, color: "gray" }}>FOTO DEL PLATO</p>
-
-        <div
-          onClick={() => setShowPicker(true)}
-          style={{
-            border: "1px dashed gray",
-            borderRadius: 12,
-            height: 140,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            flexDirection: "column"
-          }}
-        >
-          <img src="https://cdn-icons-png.flaticon.com/512/747/747376.png" width={30} />
-          <p>Añade foto del plato</p>
+        <div onClick={() => setShowPicker(true)} style={{ textAlign: "center" }}>
+          <img src="https://cdn-icons-png.flaticon.com/512/685/685655.png" width={48}/>
+          <p>Añadir foto</p>
         </div>
 
-        {/* MINIATURAS */}
-        <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+        <div style={{ display: "flex", gap: 10, marginTop: 10 }}>
           {photos.map((p, i) => (
-            <div key={i} style={{ width: 72, height: 72, borderRadius: 10, overflow: "hidden", position: "relative" }}>
-              <img src={p.preview} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-              <button onClick={() => {
-                const copy = [...photos];
-                copy.splice(i, 1);
-                setPhotos(copy);
-              }}>×</button>
-            </div>
+            <img key={i} src={p.preview} style={{
+              width: 120,
+              height: 120,
+              borderRadius: 16,
+              objectFit: "cover"
+            }} />
           ))}
-
-          {photos.length < 4 && (
-            <button onClick={() => setShowPicker(true)}>+</button>
-          )}
         </div>
       </div>
 
@@ -119,8 +144,6 @@ export default function App() {
       <button
         disabled={!photos.length}
         onClick={async () => {
-
-          setLoading(true);
 
           const res = await fetch("/api/analyze", {
             method: "POST",
@@ -131,20 +154,13 @@ export default function App() {
 
           const json = await res.json();
 
-          const enriched = (json.items || []).map(item => ({
-            ...item,
-            mode: "g",
-            unitCount: item.units?.default_count || 1
-          }));
-
-          setData(enriched);
-          setLoading(false);
+          setData(json.items || []);
 
         }}
         style={{
           width: "100%",
-          height: 54,
-          borderRadius: 14,
+          height: 56,
+          borderRadius: 16,
           background: "#1D9E75",
           color: "white",
           marginTop: 12
@@ -156,85 +172,44 @@ export default function App() {
       {/* RESULTADOS */}
       {data.map((item, i) => {
 
-        const grams =
-          item.mode === "g"
-            ? item.grams
-            : item.unitCount * item.units.grams_per_unit;
-
-        const carbs = hc(grams, item.hc_per_100g);
+        const carbs = hc(item.grams, item.hc_per_100g);
         const insulin = carbs / ratio;
+        const bolo = getBoloStrategy(item.gi, item.name, insulin);
 
         return (
           <div key={i} style={{
             background: "white",
             padding: 16,
-            borderRadius: 14,
+            borderRadius: 16,
             marginTop: 12
           }}>
 
             <p>{item.name}</p>
 
-            {item.units && (
-              <div>
-                <button onClick={() => {
-                  const copy = [...data];
-                  copy[i].mode = "g";
-                  setData(copy);
-                }}>g</button>
-
-                <button onClick={() => {
-                  const copy = [...data];
-                  copy[i].mode = "uds";
-                  setData(copy);
-                }}>uds</button>
-              </div>
-            )}
-
-            {item.mode === "g" ? (
-              <input
-                type="number"
-                value={item.grams}
-                onChange={(e) => {
-                  const copy = [...data];
-                  copy[i].grams = Number(e.target.value);
-                  setData(copy);
-                }}
-              />
-            ) : (
-              <div>
-                <button onClick={() => {
-                  const copy = [...data];
-                  copy[i].unitCount--;
-                  setData(copy);
-                }}>-</button>
-
-                {item.unitCount} {item.units.label}
-
-                <button onClick={() => {
-                  const copy = [...data];
-                  copy[i].unitCount++;
-                  setData(copy);
-                }}>+</button>
-
-                <p>≈ {grams} g</p>
-              </div>
-            )}
-
             {/* SEMÁFORO */}
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
               <div style={{
                 width: 10,
                 height: 10,
                 borderRadius: "50%",
                 background: getIGColor(item.gi)
               }} />
-              <span>HC: {carbs.toFixed(1)} g</span>
+              <span>{getIGAdvice(item.gi)}</span>
             </div>
 
-            <p>💉 Insulina: {insulin.toFixed(1)} u</p>
+            <p>HC: {carbs.toFixed(1)} g</p>
+
+            {/* 💉 BOLO COMPLETO */}
+            <p>💉 Total: {bolo.total.toFixed(1)} u</p>
+
+            <p>➡️ Ahora: {bolo.now.toFixed(1)} u</p>
+
+            {bolo.extended > 0 && (
+              <p>⏱ Extendida: {bolo.extended.toFixed(1)} u en {bolo.time}</p>
+            )}
 
             <p style={{ fontSize: 13, color: "gray" }}>
-              {getIGAdvice(item.gi)}
+              ⚠️ {bolo.advice}
             </p>
 
           </div>
@@ -242,9 +217,9 @@ export default function App() {
       })}
 
       {/* DISCLAIMER */}
-      <div style={{ fontSize: 12, marginTop: 10, color: "gray" }}>
-        ⚠️ Orientativo — no sustituye prescripción médica
-      </div>
+      <p style={{ fontSize: 12, color: "gray", marginTop: 12 }}>
+        ⚠️ Orientativo — consulta siempre con tu especialista
+      </p>
 
       {/* PICKER */}
       {showPicker && (
@@ -255,17 +230,8 @@ export default function App() {
           background: "white",
           padding: 20
         }}>
-          <label>
-            📷 Cámara
-            <input type="file" accept="image/*" capture="environment" multiple hidden onChange={(e) => handleFiles(e.target.files)} />
-          </label>
-
-          <label>
-            🖼️ Galería
-            <input type="file" accept="image/*" multiple hidden onChange={(e) => handleFiles(e.target.files)} />
-          </label>
-
-          <button onClick={() => setShowPicker(false)}>Cancelar</button>
+          <input type="file" accept="image/*" multiple onChange={(e) => handleFiles(e.target.files)} />
+          <button onClick={() => setShowPicker(false)}>Cerrar</button>
         </div>
       )}
 
