@@ -1,82 +1,40 @@
-import OpenAI from "openai";
+"use client";
 
-const client = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY
-});
+import { useState } from "react";
 
-export async function POST(req) {
-  try {
-    const { imageBase64 } = await req.json();
+export default function App() {
+  const [image, setImage] = useState(null);
+  const [resultado, setResultado] = useState(null);
 
-    const response = await client.responses.create({
-      model: "gpt-5.4-nano",
-      max_output_tokens: 800,
-      input: [
-        {
-          role: "user",
-          content: [
-            {
-              type: "input_text",
-              text: `
-Eres un nutricionista experto en diabetes tipo 1.
+  const handleUpload = async (e) => {
+    const file = e.target.files[0];
 
-Analiza la imagen de comida.
+    const reader = new FileReader();
 
-Tu tarea es SOLO identificar alimentos y estimar cantidades.
+    reader.onloadend = async () => {
+      const base64 = reader.result;
 
-Para cada alimento devuelve:
+      const res = await fetch("/api/analyze", {
+        method: "POST",
+        body: JSON.stringify({ imageBase64: base64 }),
+      });
 
-- nombre (lo más específico posible)
-- cantidad estimada (número)
-- unidad ("gramos" o "unidades")
-- confianza (número entre 0 y 1)
+      const data = await res.json();
+      setResultado(data);
+    };
 
-IMPORTANTE:
-- NO calcules hidratos de carbono
-- NO calcules índice glucémico
-- NO inventes datos nutricionales
-- Sé conservador con las cantidades
-- Si dudas entre alimentos, elige el más probable
+    reader.readAsDataURL(file);
+  };
 
-RESPONDE SOLO JSON:
+  return (
+    <div style={{ padding: 20 }}>
+      <h1>HC Vision</h1>
 
-[
-  {
-    "nombre": "pan tipo pico",
-    "cantidad": 5,
-    "unidad": "unidades",
-    "confianza": 0.9
-  }
-]
-`
-            },
-            {
-              type: "input_image",
-              image_url: imageBase64
-            }
-          ]
-        }
-      ]
-    });
+      <input type="file" onChange={handleUpload} />
 
-    // 🔥 PARSEAR RESPUESTA
-    const text = response.output_text;
-
-    let json;
-
-    try {
-      json = JSON.parse(text);
-    } catch (e) {
-      console.error("Error parsing JSON:", text);
-      return new Response(JSON.stringify([]), { status: 200 });
-    }
-
-    return new Response(JSON.stringify(json), { status: 200 });
-
-  } catch (error) {
-    console.error(error);
-    return new Response(JSON.stringify({ error: "Error en análisis" }), {
-      status: 500
-    });
-  }
+      {resultado && (
+        <pre>{JSON.stringify(resultado, null, 2)}</pre>
+      )}
+    </div>
+  );
 }
