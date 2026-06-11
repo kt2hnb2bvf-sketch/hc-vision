@@ -8,12 +8,10 @@ export default function App() {
 
   const handleUpload = async (e) => {
     const files = Array.from(e.target.files);
-
     if (!files.length) return;
 
     setLoading(true);
 
-    // Convertir todas las imágenes a base64
     const base64Images = await Promise.all(
       files.map(file => {
         return new Promise((resolve) => {
@@ -33,29 +31,74 @@ export default function App() {
     });
 
     const data = await res.json();
-
     setResultado(data);
     setLoading(false);
   };
 
   return (
-    <div style={{ padding: 30, fontFamily: "Arial" }}>
-      <h1>🍽️ HC Vision</h1>
+    <div style={{
+      minHeight: "100vh",
+      background: "#f5f7fb",
+      padding: "30px",
+      fontFamily: "system-ui"
+    }}>
+      
+      <h1 style={{ fontSize: "32px", marginBottom: "20px" }}>
+        🍽️ HC Vision
+      </h1>
 
-      <input
-        type="file"
-        accept="image/*"
-        capture="environment"
-        multiple
-        onChange={handleUpload}
-      />
+      {/* BOTÓN BONITO */}
+      <label style={{
+        display: "inline-block",
+        padding: "14px 20px",
+        background: "#0070f3",
+        color: "white",
+        borderRadius: "10px",
+        cursor: "pointer",
+        fontWeight: "bold"
+      }}>
+        📸 Subir o hacer foto
 
-      {loading && <p>Analizando...</p>}
+        <input
+          type="file"
+          accept="image/*"
+          capture="environment"
+          multiple
+          onChange={handleUpload}
+          style={{ display: "none" }}
+        />
+      </label>
 
+      {/* LOADING */}
+      {loading && (
+        <p style={{ marginTop: 20 }}>🔍 Analizando plato...</p>
+      )}
+
+      {/* RESULTADOS BONITOS */}
       {resultado && (
-        <pre style={{ marginTop: 20 }}>
-          {JSON.stringify(resultado, null, 2)}
-        </pre>
+        <div style={{ marginTop: 30 }}>
+          <h2>Resultados:</h2>
+
+          {resultado.map((item, i) => (
+            <div key={i} style={{
+              background: "white",
+              padding: "15px",
+              marginTop: "10px",
+              borderRadius: "12px",
+              boxShadow: "0 4px 10px rgba(0,0,0,0.05)"
+            }}>
+              <strong>{item.nombre}</strong>
+
+              <p>
+                {item.cantidad} {item.unidad}
+              </p>
+
+              <p>
+                Confianza: {Math.round(item.confianza * 100)}%
+              </p>
+            </div>
+          ))}
+        </div>
       )}
     </div>
   );
