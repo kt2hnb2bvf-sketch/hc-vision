@@ -19,41 +19,26 @@ export async function POST(req) {
               text: `
 Eres experto en nutrición para diabetes tipo 1.
 
-Analiza la comida de las imágenes.
+Analiza la comida.
 
-OBJETIVO:
-El usuario NO sabe gramos → piensa en unidades (piezas, cucharadas, etc).
+IMPORTANTE:
+- Si se puede contar → usa piezas + gramos_por_pieza
+- Si no → usa cantidad en gramos
 
-REGLAS CLAVE:
-- Si el alimento se puede contar (sushi, pan, galletas, fruta...):
-  devuelve SIEMPRE:
-    "piezas" y "gramos_por_pieza"
-
-- Si NO se puede contar:
-  devuelve:
-    "cantidad" en gramos
-
-- NO dejes campos undefined
-
-FORMATO EXACTO:
+Formato:
 
 [
   {
-    "nombre": "sushi maki (arroz con sésamo)",
+    "nombre": "sushi maki",
     "piezas": 8,
     "gramos_por_pieza": 30,
     "cantidad": null,
     "confianza": 0.9
   }
 ]
-
-IMPORTANTE:
-- Sé realista con pesos (ej: sushi 25-35g por pieza)
-- Si dudas, aproxima conservador
 `
             },
-
-            ...images.map((img) => ({
+            ...images.map(img => ({
               type: "input_image",
               image_url: img
             }))
@@ -68,31 +53,22 @@ IMPORTANTE:
 
     try {
       json = JSON.parse(text);
-    } catch (e) {
-      console.error("Error parsing JSON:", text);
+    } catch {
       return new Response(JSON.stringify([]), { status: 200 });
     }
 
-    // 🔥 NORMALIZACIÓN (EVITA NaN Y ERRORES)
     const normalized = json.map(item => ({
       nombre: item.nombre || "alimento",
       piezas: item.piezas ?? 0,
-      gramos_por_pieza: item.gramos_por_pieza ?? 0,
-      cantidad: item.cantidad ?? null,
-      confianza: item.confianza ?? 0.8
+      gramos_por_pieza: item.gramos_por_pieza ?? 30,
+      cantidad: item.cantidad ?? null
     }));
 
     return new Response(JSON.stringify(normalized), {
-      status: 200,
-      headers: { "Content-Type": "application/json" }
+      status: 200
     });
 
   } catch (error) {
-    console.error(error);
-
-    return new Response(
-      JSON.stringify({ error: "Error en análisis" }),
-      { status: 500 }
-    );
+    return new Response(JSON.stringify({ error: "Error" }), { status: 500 });
   }
 }
