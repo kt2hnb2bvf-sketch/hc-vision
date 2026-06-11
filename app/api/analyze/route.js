@@ -1,67 +1,36 @@
-import OpenAI from "openai";
+{
+  type: "input_text",
+  text: `
+Eres un nutricionista experto en diabetes tipo 1.
 
-const client = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY
-});
+Analiza la imagen de comida.
 
-export async function POST(req) {
-  try {
-    const { imageBase64 } = await req.json();
+Tu tarea es SOLO identificar alimentos y estimar cantidades.
 
-    const response = await client.responses.create({
-      model: "gpt-5.4-nano",
-      max_output_tokens: 800,
-      input: [{
-        role: "user",
-        content: [
-          {
-            type: "input_text",
-            text: `
-Eres un asistente experto en nutrición para diabéticos tipo 1 en España.
+Para cada alimento devuelve:
 
-Analiza esta imagen de comida.
-
-Para cada alimento:
-- identifica el alimento
-- estima gramos
-- calcula HC por 100g
-- calcula HC totales
-- estima índice glucémico
+- nombre (lo más específico posible)
+- cantidad estimada (número)
+- unidad ("gramos" o "unidades")
+- confianza (número entre 0 y 1)
 
 IMPORTANTE:
-Si dudas (ej: pan vs salchicha), marca "posible_confusion": true
+- NO calcules hidratos de carbono
+- NO calcules índice glucémico
+- NO inventes datos nutricionales
+- Sé conservador con las cantidades
+- Si dudas entre alimentos (ej: pan vs salchicha), elige el más probable
+- Si hay varios alimentos, sepáralos
 
-RESPONDE SOLO JSON:
+RESPONDE SOLO JSON (sin texto extra):
 
-{
-  "alimentos": [
-    {
-      "nombre": "string",
-      "gramos_estimados": number,
-      "hc_por_100g": number,
-      "hc_totales": number,
-      "ig": number,
-      "confianza": "alta|media|baja",
-      "posible_confusion": true|false
-    }
-  ]
-}
-`
-          },
-          {
-            type: "input_image",
-            image_url: imageBase64
-          }
-        ]
-      }]
-    });
-
-    const text = response.output_text || "{}";
-    const clean = text.replace(/```json|```/g, "").trim();
-
-    return Response.json(JSON.parse(clean));
-
-  } catch (error) {
-    return Response.json({ error: error.message });
+[
+  {
+    "nombre": "pan tipo pico",
+    "cantidad": 5,
+    "unidad": "unidades",
+    "confianza": 0.9
   }
+]
+`
 }
