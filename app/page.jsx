@@ -5,21 +5,9 @@ import { useState, useEffect } from "react";
 export default function App() {
   const [images, setImages] = useState([]);
   const [resultado, setResultado] = useState([]);
-  const [historial, setHistorial] = useState([]);
-  const [aprendizaje, setAprendizaje] = useState({});
-  const [mealType, setMealType] = useState("comida");
-
   const [ratio, setRatio] = useState(10);
+  const [meal, setMeal] = useState("comida");
 
-  useEffect(() => {
-    const saved = localStorage.getItem("historial");
-    const learn = localStorage.getItem("aprendizaje");
-
-    if (saved) setHistorial(JSON.parse(saved));
-    if (learn) setAprendizaje(JSON.parse(learn));
-  }, []);
-
-  // 🧠 HC por alimento
   const calcularHC = (nombre, gramos) => {
     const n = nombre.toLowerCase();
 
@@ -30,29 +18,26 @@ export default function App() {
     return gramos * 0.15;
   };
 
-  // 🚦 semáforo
   const semaforo = (hc) => {
-    if (hc < 10) return "🟢";
-    if (hc < 30) return "🟡";
-    return "🔴";
+    if (hc < 10) return "#34C759"; // verde iOS
+    if (hc < 30) return "#FF9F0A"; // naranja iOS
+    return "#FF3B30"; // rojo iOS
   };
 
-  // 🧠 recomendaciones médicas
-  const infoClinica = (nombre) => {
+  const consejo = (nombre) => {
     const n = nombre.toLowerCase();
 
     if (n.includes("sushi") || n.includes("arroz")) {
-      return "⚠️ IG alto → haz prebolo 10-15 min antes";
+      return "⚠️ Pre-bolo recomendado (IG alto)";
     }
 
     if (n.includes("pizza") || n.includes("pasta")) {
-      return "🍕 absorción lenta → bolo extendido";
+      return "🍕 Bolo extendido recomendado";
     }
 
-    return "🟢 impacto bajo";
+    return "🟢 Impacto bajo";
   };
 
-  // 📷 subir imágenes
   const handleUpload = async (e) => {
     const files = Array.from(e.target.files);
 
@@ -71,76 +56,40 @@ export default function App() {
       body: JSON.stringify({ images: base64Images })
     });
 
-    let data = await res.json();
-
-    // 🧠 aplicar aprendizaje
-    data = data.map(item => {
-      const key = item.nombre.toLowerCase();
-      if (aprendizaje[key]) {
-        return { ...item, cantidad: aprendizaje[key] };
-      }
-      return item;
-    });
-
+    const data = await res.json();
     setResultado(data);
   };
 
-  // 🔧 slider gramos
-  const ajustarGramos = (i, gramos) => {
+  const ajustar = (i, val) => {
     const copia = [...resultado];
-    copia[i].cantidad = Number(gramos);
+    copia[i].cantidad = Number(val);
     setResultado(copia);
   };
 
-  // 💾 guardar comida + aprendizaje
-  const guardar = () => {
-    const nueva = {
-      tipo: mealType,
-      fecha: new Date().toLocaleString(),
-      data: resultado
-    };
-
-    const nuevoHist = [nueva, ...historial];
-
-    setHistorial(nuevoHist);
-    localStorage.setItem("historial", JSON.stringify(nuevoHist));
-
-    const nuevoApr = { ...aprendizaje };
-
-    resultado.forEach(r => {
-      nuevoApr[r.nombre.toLowerCase()] = r.cantidad;
-    });
-
-    setAprendizaje(nuevoApr);
-    localStorage.setItem("aprendizaje", JSON.stringify(nuevoApr));
-
-    alert("✅ guardado y aprendido");
-  };
-
   return (
-    <div style={{ fontFamily: "system-ui", padding: 20, maxWidth: 500, margin: "auto" }}>
+    <div style={{
+      fontFamily: "-apple-system, BlinkMacSystemFont",
+      background: "#F2F2F7",
+      minHeight: "100vh",
+      padding: 20
+    }}>
 
-      <h1 style={{ fontSize: 28 }}>🍽️ HC Vision PRO+</h1>
+      <h1 style={{ fontSize: 30, fontWeight: 700 }}>🍽️ HC Vision</h1>
 
-      {/* ⚙️ ajustes */}
-      <div style={{ marginBottom: 20 }}>
-        <p>Ratio insulina</p>
-        <input value={ratio} onChange={e => setRatio(e.target.value)} />
-      </div>
-
-      {/* 🍽️ selector comidas */}
-      <div style={{ display: "flex", gap: 10, marginBottom: 20 }}>
-        {["desayuno", "comida", "merienda", "cena"].map(t => (
+      {/* selector comidas */}
+      <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
+        {["desayuno","comida","merienda","cena"].map(t => (
           <button
             key={t}
-            onClick={() => setMealType(t)}
+            onClick={() => setMeal(t)}
             style={{
               flex: 1,
               padding: 10,
               borderRadius: 20,
               border: "none",
-              background: mealType === t ? "#007AFF" : "#eee",
-              color: mealType === t ? "white" : "black"
+              background: meal === t ? "#007AFF" : "#E5E5EA",
+              color: meal === t ? "white" : "black",
+              fontWeight: 500
             }}
           >
             {t}
@@ -148,19 +97,19 @@ export default function App() {
         ))}
       </div>
 
-      {/* 📷 botón iPhone */}
-      <label
-        style={{
-          display: "block",
-          padding: 20,
-          borderRadius: 20,
-          background: "#007AFF",
-          color: "white",
-          textAlign: "center",
-          marginBottom: 20,
-          cursor: "pointer"
-        }}
-      >
+      {/* botón cámara estilo iPhone */}
+      <label style={{
+        display: "block",
+        marginTop: 20,
+        padding: 18,
+        borderRadius: 20,
+        background: "linear-gradient(135deg,#007AFF,#5AC8FA)",
+        color: "white",
+        textAlign: "center",
+        fontWeight: 600,
+        cursor: "pointer",
+        boxShadow: "0 6px 15px rgba(0,0,0,0.2)"
+      }}>
         📷 Subir o hacer foto
         <input
           type="file"
@@ -173,66 +122,52 @@ export default function App() {
       </label>
 
       {/* resultados */}
-      {resultado.map((item, i) => {
-        const hc = calcularHC(item.nombre, item.cantidad);
-        const insulina = hc / ratio;
+      <div style={{ marginTop: 20 }}>
+        {resultado.map((item, i) => {
+          const hc = calcularHC(item.nombre, item.cantidad);
+          const insulina = hc / ratio;
 
-        return (
-          <div
-            key={i}
-            style={{
+          return (
+            <div key={i} style={{
               background: "white",
-              padding: 15,
               borderRadius: 20,
+              padding: 15,
               marginBottom: 15,
-              boxShadow: "0 4px 10px rgba(0,0,0,0.1)"
-            }}
-          >
-            <h3>{item.nombre}</h3>
+              boxShadow: "0 4px 12px rgba(0,0,0,0.1)"
+            }}>
+              <h3 style={{ marginBottom: 10 }}>{item.nombre}</h3>
 
-            <input
-              type="range"
-              min="0"
-              max="400"
-              value={item.cantidad}
-              onChange={(e) => ajustarGramos(i, e.target.value)}
-              style={{ width: "100%" }}
-            />
+              <input
+                type="range"
+                min="0"
+                max="400"
+                value={item.cantidad}
+                onChange={(e) => ajustar(i, e.target.value)}
+                style={{ width: "100%" }}
+              />
 
-            <p>{item.cantidad} g</p>
-            <p>{semaforo(hc)} HC: {hc.toFixed(1)} g</p>
-            <p>💉 {insulina.toFixed(1)} u</p>
-            <p style={{ fontSize: 12 }}>{infoClinica(item.nombre)}</p>
-          </div>
-        );
-      })}
+              <p>{item.cantidad} g</p>
 
-      {resultado.length > 0 && (
-        <button
-          onClick={guardar}
-          style={{
-            width: "100%",
-            padding: 15,
-            borderRadius: 20,
-            background: "green",
-            color: "white",
-            border: "none",
-            marginBottom: 20
-          }}
-        >
-          Guardar comida
-        </button>
-      )}
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <div style={{
+                  width: 12,
+                  height: 12,
+                  borderRadius: "50%",
+                  background: semaforo(hc)
+                }}></div>
 
-      {/* historial */}
-      <h3>📊 Historial</h3>
+                <p>HC: {hc.toFixed(1)} g</p>
+              </div>
 
-      {historial.map((h, i) => (
-        <div key={i} style={{ fontSize: 12, marginBottom: 10 }}>
-          {h.tipo} - {h.fecha}
-        </div>
-      ))}
+              <p>💉 {insulina.toFixed(1)} u</p>
 
+              <p style={{ fontSize: 12, color: "#666" }}>
+                {consejo(item.nombre)}
+              </p>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
