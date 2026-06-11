@@ -26,17 +26,10 @@ Tu tarea es SOLO identificar alimentos y estimar cantidades.
 
 Para cada alimento devuelve:
 
-- nombre (lo más específico posible)
-- cantidad estimada (número)
+- nombre
+- cantidad
 - unidad ("gramos" o "unidades")
-- confianza (número entre 0 y 1)
-
-IMPORTANTE:
-- NO calcules hidratos de carbono
-- NO calcules índice glucémico
-- NO inventes datos nutricionales
-- Sé conservador con las cantidades
-- Si dudas entre alimentos, elige el más probable
+- confianza (0 a 1)
 
 RESPONDE SOLO JSON:
 
