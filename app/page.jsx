@@ -4,236 +4,234 @@ import { useState, useEffect } from "react";
 
 export default function App() {
 
-  const [resultado, setResultado] = useState([]);
-  const [meal, setMeal] = useState("comida");
+  const [data, setData] = useState([]);
   const [ratio, setRatio] = useState(10);
-  const [history, setHistory] = useState([]);
+  const [history, setHistory] = useState({});
+  const [selectedMeal, setSelectedMeal] = useState("cena");
 
-  // ICONOS PRO
-  const meals = [
-    { key: "desayuno", icon: "🥐" },
-    { key: "media-mañana", icon: "🧃" },
-    { key: "comida", icon: "🍽️" },
-    { key: "merienda", icon: "☕" },
-    { key: "cena", icon: "🌙" },
-    { key: "snack", icon: "🍎" }
-  ];
-
-  // 📷 SUBIR FOTO
+  // 🔥 SUBIR FOTO
   const handleUpload = async (e) => {
-    const files = Array.from(e.target.files);
+    const file = e.target.files[0];
 
-    const base64Images = await Promise.all(
-      files.map(file => new Promise(resolve => {
-        const reader = new FileReader();
-        reader.onloadend = () => resolve(reader.result);
-        reader.readAsDataURL(file);
-      }))
-    );
+    const reader = new FileReader();
 
-    const res = await fetch("/api/analyze", {
-      method: "POST",
-      body: JSON.stringify({ images: base64Images })
-    });
+    reader.onloadend = async () => {
+      const res = await fetch("/api/analyze", {
+        method: "POST",
+        body: JSON.stringify({ images: [reader.result] }),
+      });
 
-    const data = await res.json();
+      const result = await res.json();
 
-    // 🔥 CONVERSIÓN INTELIGENTE A UNIDADES
-    const enriched = data.map(item => {
-      let unidades = "";
+      const enriched = result.map(item => {
+        let gramos = 0;
 
-      if (item.nombre.toLowerCase().includes("sushi")) {
-        unidades = Math.round(item.cantidad / 35) + " piezas";
-      }
+        if (item.piezas && item.gramos_por_pieza) {
+          gramos = item.piezas * item.gramos_por_pieza;
+        } else if (item.cantidad) {
+          gramos = item.cantidad;
+        }
 
-      if (item.nombre.toLowerCase().includes("pan")) {
-        unidades = Math.round(item.cantidad / 10) + " picos";
-      }
+        return {
+          ...item,
+          gramos,
+          piezas: item.piezas || 0
+        };
+      });
 
-      return { ...item, unidades };
-    });
-
-    setResultado(enriched);
-  };
-
-  // HC
-  const calcularHC = (nombre, gramos) => {
-    const n = nombre.toLowerCase();
-
-    if (n.includes("arroz") || n.includes("sushi")) return gramos * 0.30;
-    if (n.includes("pan")) return gramos * 0.50;
-    if (n.includes("pasta")) return gramos * 0.25;
-
-    return gramos * 0.15;
-  };
-
-  // CONSEJO
-  const consejo = (nombre) => {
-    const n = nombre.toLowerCase();
-
-    if (n.includes("sushi") || n.includes("arroz"))
-      return "⚠️ IG alto · prebolo recomendado";
-
-    if (n.includes("pizza"))
-      return "🍕 absorción lenta · bolo extendido";
-
-    return "🟢 impacto bajo";
-  };
-
-  // EDITAR
-  const updateItem = (i, field, value) => {
-    const copy = [...resultado];
-    copy[i][field] = field === "cantidad" ? Number(value) : value;
-    setResultado(copy);
-  };
-
-  // GUARDAR COMIDA
-  const guardarComida = () => {
-    const today = new Date().toLocaleDateString();
-
-    const entry = {
-      date: today,
-      meal,
-      items: resultado
+      setData(enriched);
     };
 
-    const newHistory = [...history, entry];
-    setHistory(newHistory);
-
-    localStorage.setItem("gluco_history", JSON.stringify(newHistory));
+    reader.readAsDataURL(file);
   };
 
-  // CARGAR HISTORIAL
+  const hc = (g) => g * 0.3;
+
+  // 🔥 GUARDAR POR DÍAS Y COMIDAS
+  const guardar = () => {
+    const fecha = new Date().toLocaleDateString();
+
+    const newEntry = {
+      meal: selectedMeal,
+      items: data,
+      totalHC: data.reduce((acc, i) => acc + hc(i.gramos), 0)
+    };
+
+    const updated = { ...history };
+
+    if (!updated[fecha]) updated[fecha] = [];
+
+    updated[fecha].push(newEntry);
+
+    setHistory(updated);
+    localStorage.setItem("history", JSON.stringify(updated));
+  };
+
   useEffect(() => {
-    const saved = localStorage.getItem("gluco_history");
+    const saved = localStorage.getItem("history");
     if (saved) setHistory(JSON.parse(saved));
   }, []);
 
   return (
-    <div style={{
-      background: "#F2F2F7",
-      minHeight: "100vh",
-      fontFamily: "-apple-system",
-      display: "flex",
-      justifyContent: "center",
-      padding: 20
-    }}>
+    <div style={{ display: "flex", fontFamily: "-apple-system" }}>
 
-      <div style={{ width: 390 }}>
+      {/* 🔥 PANEL IZQUIERDO */}
+      <div style={{
+        width: 260,
+        background: "#111",
+        color: "white",
+        padding: 15,
+        height: "100vh",
+        overflow: "auto"
+      }}>
+        <h3>📅 Historial</h3>
 
-        <h2>💉 GlucoMate</h2>
+        {Object.keys(history).map((day, i) => (
+          <div key={i} style={{ marginBottom: 20 }}>
+            <strong>{day}</strong>
 
-        {/* RATIO */}
-        <input
-          value={ratio}
-          onChange={(e) => setRatio(e.target.value)}
-          style={{ width: "100%", marginBottom: 20 }}
-        />
-
-        {/* MEALS */}
-        <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
-          {meals.map(m => (
-            <button
-              key={m.key}
-              onClick={() => setMeal(m.key)}
-              style={{
-                flex: 1,
+            {history[day].map((meal, j) => (
+              <div key={j} style={{
+                marginTop: 10,
                 padding: 10,
-                borderRadius: 20,
-                background: meal === m.key ? "#007AFF" : "#ddd",
-                color: meal === m.key ? "white" : "black"
-              }}
-            >
-              {m.icon}
-            </button>
-          ))}
-        </div>
+                background: "#222",
+                borderRadius: 10
+              }}>
+                🍽 {meal.meal}
+                <br />
+                HC: {meal.totalHC.toFixed(1)} g
+              </div>
+            ))}
+          </div>
+        ))}
+      </div>
 
-        {/* BOTÓN */}
-        <label style={{
-          display: "block",
-          background: "#007AFF",
-          padding: 16,
-          borderRadius: 20,
-          color: "white",
-          textAlign: "center",
-          marginBottom: 20
-        }}>
-          📷 Analizar comida
+      {/* 🔥 APP */}
+      <div style={{
+        flex: 1,
+        background: "#F2F2F7",
+        padding: 20,
+        display: "flex",
+        justifyContent: "center"
+      }}>
+
+        <div style={{ width: 380 }}>
+
+          <h2>💉 GlucoMate</h2>
+
           <input
-            type="file"
-            accept="image/*"
-            capture="environment"
-            multiple
-            hidden
-            onChange={handleUpload}
+            value={ratio}
+            onChange={(e) => setRatio(e.target.value)}
+            style={{
+              width: "100%",
+              padding: 10,
+              borderRadius: 12,
+              marginBottom: 20
+            }}
           />
-        </label>
 
-        {/* RESULTADOS */}
-        {resultado.map((item, i) => {
-          const hc = calcularHC(item.nombre, item.cantidad);
-          const insulina = hc / ratio;
+          {/* 🔥 COMIDAS */}
+          <div style={{ display: "flex", gap: 10, marginBottom: 20 }}>
+            {["desayuno","comida","merienda","cena","snack"].map(m => (
+              <button
+                key={m}
+                onClick={() => setSelectedMeal(m)}
+                style={{
+                  padding: 8,
+                  borderRadius: 10,
+                  background: selectedMeal === m ? "#007AFF" : "#ddd"
+                }}
+              >
+                {m}
+              </button>
+            ))}
+          </div>
 
-          return (
-            <div key={i} style={{
-              background: "white",
-              padding: 15,
-              borderRadius: 20,
-              marginBottom: 10
-            }}>
-              <input
-                value={item.nombre}
-                onChange={(e) => updateItem(i, "nombre", e.target.value)}
-                style={{ width: "100%" }}
-              />
+          {/* 🔥 FOTO */}
+          <label style={{
+            background: "#007AFF",
+            color: "white",
+            padding: 15,
+            borderRadius: 20,
+            display: "block",
+            textAlign: "center",
+            marginBottom: 20
+          }}>
+            📷 Analizar comida
+            <input type="file" hidden onChange={handleUpload} />
+          </label>
 
-              <input
-                type="range"
-                min="0"
-                max="400"
-                value={item.cantidad}
-                onChange={(e) => updateItem(i, "cantidad", e.target.value)}
-              />
+          {/* 🔥 RESULTADOS */}
+          {data.map((item, i) => {
+            const gramos = item.gramos;
+            const hidratos = hc(gramos);
+            const insulina = hidratos / ratio;
 
-              <p>{item.cantidad} g · {item.unidades}</p>
+            return (
+              <div key={i} style={{
+                background: "white",
+                padding: 15,
+                borderRadius: 20,
+                marginBottom: 15
+              }}>
+                <input
+                  value={item.nombre}
+                  onChange={(e) => {
+                    const copy = [...data];
+                    copy[i].nombre = e.target.value;
+                    setData(copy);
+                  }}
+                  style={{ width: "100%", marginBottom: 10 }}
+                />
 
-              <p>HC: {hc.toFixed(1)} g</p>
-              <p>💉 {insulina.toFixed(1)} u</p>
+                {/* 🔥 PIEZAS EDITABLE */}
+                <div>
+                  🍣 piezas:
+                  <input
+                    type="number"
+                    value={item.piezas}
+                    onChange={(e) => {
+                      const copy = [...data];
+                      copy[i].piezas = Number(e.target.value);
+                      copy[i].gramos =
+                        copy[i].piezas * (item.gramos_por_pieza || 30);
+                      setData(copy);
+                    }}
+                    style={{ width: 60, marginLeft: 10 }}
+                  />
+                </div>
 
-              <p>{consejo(item.nombre)}</p>
-            </div>
-          );
-        })}
+                <p>{gramos} g</p>
+                <p>HC: {hidratos.toFixed(1)} g</p>
+                <p>💉 {insulina.toFixed(1)} u</p>
 
-        {/* GUARDAR */}
-        <button
-          onClick={guardarComida}
-          style={{
+                <input
+                  type="range"
+                  min="0"
+                  max="400"
+                  value={gramos}
+                  onChange={(e) => {
+                    const copy = [...data];
+                    copy[i].gramos = Number(e.target.value);
+                    setData(copy);
+                  }}
+                  style={{ width: "100%" }}
+                />
+              </div>
+            );
+          })}
+
+          <button onClick={guardar} style={{
             width: "100%",
-            padding: 16,
+            padding: 15,
             background: "green",
             color: "white",
             borderRadius: 20
-          }}
-        >
-          Guardar comida
-        </button>
-
-        {/* HISTORIAL */}
-        <h3>📊 Historial</h3>
-
-        {history.map((h, i) => (
-          <div key={i} style={{
-            background: "white",
-            padding: 10,
-            borderRadius: 15,
-            marginBottom: 10
           }}>
-            <p>{h.date} · {h.meal}</p>
-          </div>
-        ))}
+            Guardar comida
+          </button>
 
+        </div>
       </div>
     </div>
   );
