@@ -15,16 +15,15 @@ export async function POST(req) {
 Analiza comida.
 
 Makis:
-- 1 maki = 30-35g
-- 8 makis ≈ 240-280g
+8 makis ≈ 240g
 
 Devuelve JSON:
 {
  items:[{
   name:"",
   grams:0,
-  hc_per_100g:0,
-  gi:0
+  hc_per_100g:22,
+  gi:42
  }]
 }
 `
@@ -36,7 +35,7 @@ Devuelve JSON:
     ];
 
     const response = await client.responses.create({
-      model: "gpt-5.4-nano",
+      model: "gpt-4o-mini",
       input: [{ role: "user", content }]
     });
 
