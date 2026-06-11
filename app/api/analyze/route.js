@@ -1,16 +1,21 @@
 import OpenAI from "openai";
 
-const client = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
-
 export async function POST(req) {
   try {
-    const { imageBase64 } = await req.json();
+    const client = new OpenAI({
+      apiKey: process.env.OPENAI_API_KEY,
+    });
+
+    const { images } = await req.json();
+
+    if (!images || images.length === 0) {
+      return new Response(JSON.stringify({ error: "No images" }), {
+        status: 400,
+      });
+    }
 
     const response = await client.responses.create({
-      model: "gpt-5.4-nano",
-      max_output_tokens: 800,
+      model: "gpt-4.1-mini",
       input: [
         {
           role: "user",
@@ -20,43 +25,40 @@ export async function POST(req) {
               text: `
 Eres un nutricionista experto en diabetes tipo 1.
 
-Analiza la imagen de comida.
+Analiza TODAS las imágenes del mismo plato (pueden ser distintos ángulos).
 
-Tu tarea es SOLO identificar alimentos y estimar cantidades.
+Tu tarea:
+- identificar alimentos
+- estimar cantidades
 
 Para cada alimento devuelve:
 
-- nombre (lo más específico posible)
-- cantidad estimada (número)
+- nombre
+- cantidad
 - unidad ("gramos" o "unidades")
-- confianza (número entre 0 y 1)
-
-IMPORTANTE:
-- NO calcules hidratos de carbono
-- NO calcules índice glucémico
-- NO inventes datos nutricionales
-- Sé conservador con las cantidades
-- Si dudas entre alimentos, elige el más probable
+- confianza (0 a 1)
 
 RESPONDE SOLO JSON:
 
 [
   {
-    "nombre": "pan tipo pico",
-    "cantidad": 5,
-    "unidad": "unidades",
-    "confianza": 0.9
+    "nombre": "pan",
+    "cantidad": 50,
+    "unidad": "gramos",
+    "confianza": 0.8
   }
 ]
-`,
+`
             },
-            {
+
+            // 🔥 AÑADE TODAS LAS IMÁGENES
+            ...images.map(img => ({
               type: "input_image",
-              image_url: imageBase64,
-            },
-          ],
-        },
-      ],
+              image_url: img
+            }))
+          ]
+        }
+      ]
     });
 
     const text = response.output_text;
@@ -70,13 +72,15 @@ RESPONDE SOLO JSON:
       return new Response(JSON.stringify([]), { status: 200 });
     }
 
-    return new Response(JSON.stringify(json), { status: 200 });
+    return new Response(JSON.stringify(json), {
+      status: 200,
+    });
 
   } catch (error) {
     console.error(error);
-    return new Response(
-      JSON.stringify({ error: "Error en análisis" }),
-      { status: 500 }
-    );
+
+    return new Response(JSON.stringify({ error: "Error en análisis" }), {
+      status: 500,
+    });
   }
 }

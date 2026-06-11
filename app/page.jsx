@@ -4,71 +4,58 @@ import { useState } from "react";
 
 export default function App() {
   const [resultado, setResultado] = useState(null);
+  const [loading, setLoading] = useState(false);
 
   const handleUpload = async (e) => {
-    const file = e.target.files[0];
-    const reader = new FileReader();
+    const files = Array.from(e.target.files);
 
-    reader.onloadend = async () => {
-      const base64 = reader.result;
+    if (!files.length) return;
 
-      const res = await fetch("/api/analyze", {
-        method: "POST",
-        body: JSON.stringify({ imageBase64: base64 }),
-      });
+    setLoading(true);
 
-      const data = await res.json();
-      setResultado(data);
-    };
+    // Convertir todas las imágenes a base64
+    const base64Images = await Promise.all(
+      files.map(file => {
+        return new Promise((resolve) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result);
+          reader.readAsDataURL(file);
+        });
+      })
+    );
 
-    reader.readAsDataURL(file);
+    const res = await fetch("/api/analyze", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ images: base64Images }),
+    });
+
+    const data = await res.json();
+
+    setResultado(data);
+    setLoading(false);
   };
 
   return (
-    <div style={{
-      minHeight: "100vh",
-      background: "#0f172a",
-      color: "white",
-      display: "flex",
-      flexDirection: "column",
-      alignItems: "center",
-      justifyContent: "center",
-      fontFamily: "sans-serif"
-    }}>
-      
-      <h1 style={{ fontSize: 40, marginBottom: 20 }}>
-        🧠 HC Vision
-      </h1>
+    <div style={{ padding: 30, fontFamily: "Arial" }}>
+      <h1>🍽️ HC Vision</h1>
 
-      <label style={{
-        background: "#3b82f6",
-        padding: "12px 20px",
-        borderRadius: 10,
-        cursor: "pointer"
-      }}>
-        📸 Subir comida
-        <input
-          type="file"
-          accept="image/*"
-          capture="environment"
-          onChange={handleUpload}
-          style={{ display: "none" }}
-        />
-      </label>
+      <input
+        type="file"
+        accept="image/*"
+        capture="environment"
+        multiple
+        onChange={handleUpload}
+      />
+
+      {loading && <p>Analizando...</p>}
 
       {resultado && (
-        <div style={{
-          marginTop: 30,
-          background: "#1e293b",
-          padding: 20,
-          borderRadius: 10,
-          width: 300
-        }}>
-          <h3>Resultado:</h3>
-          <pre style={{ fontSize: 12 }}>
-            {JSON.stringify(resultado, null, 2)}
-          </pre>
-        </div>
+        <pre style={{ marginTop: 20 }}>
+          {JSON.stringify(resultado, null, 2)}
+        </pre>
       )}
     </div>
   );
