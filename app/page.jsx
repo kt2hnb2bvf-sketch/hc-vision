@@ -3,10 +3,16 @@
 import { useState, useEffect } from "react";
 
 export default function App() {
-  const [images, setImages] = useState([]);
+
   const [resultado, setResultado] = useState([]);
-  const [ratio, setRatio] = useState(10);
+  const [historial, setHistorial] = useState([]);
   const [meal, setMeal] = useState("comida");
+  const [ratio, setRatio] = useState(10);
+
+  useEffect(() => {
+    const saved = localStorage.getItem("historial");
+    if (saved) setHistorial(JSON.parse(saved));
+  }, []);
 
   const calcularHC = (nombre, gramos) => {
     const n = nombre.toLowerCase();
@@ -19,36 +25,32 @@ export default function App() {
   };
 
   const semaforo = (hc) => {
-    if (hc < 10) return "#34C759"; // verde iOS
-    if (hc < 30) return "#FF9F0A"; // naranja iOS
-    return "#FF3B30"; // rojo iOS
+    if (hc < 10) return "#34C759";
+    if (hc < 30) return "#FF9F0A";
+    return "#FF3B30";
   };
 
   const consejo = (nombre) => {
     const n = nombre.toLowerCase();
 
-    if (n.includes("sushi") || n.includes("arroz")) {
-      return "⚠️ Pre-bolo recomendado (IG alto)";
-    }
+    if (n.includes("sushi") || n.includes("arroz"))
+      return "⚠️ Prebolo 10-15 min";
 
-    if (n.includes("pizza") || n.includes("pasta")) {
-      return "🍕 Bolo extendido recomendado";
-    }
+    if (n.includes("pizza") || n.includes("pasta"))
+      return "🍕 Bolo extendido";
 
-    return "🟢 Impacto bajo";
+    return "🟢 Bajo impacto";
   };
 
   const handleUpload = async (e) => {
     const files = Array.from(e.target.files);
 
     const base64Images = await Promise.all(
-      files.map(file => {
-        return new Promise(resolve => {
-          const reader = new FileReader();
-          reader.onloadend = () => resolve(reader.result);
-          reader.readAsDataURL(file);
-        });
-      })
+      files.map(file => new Promise(resolve => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result);
+        reader.readAsDataURL(file);
+      }))
     );
 
     const res = await fetch("/api/analyze", {
@@ -66,18 +68,67 @@ export default function App() {
     setResultado(copia);
   };
 
+  const guardar = () => {
+    const nueva = {
+      tipo: meal,
+      fecha: new Date().toLocaleString(),
+      data: resultado
+    };
+
+    const nuevo = [nueva, ...historial];
+    setHistorial(nuevo);
+
+    localStorage.setItem("historial", JSON.stringify(nuevo));
+
+    alert("Guardado ✔️");
+  };
+
   return (
     <div style={{
-      fontFamily: "-apple-system, BlinkMacSystemFont",
+      fontFamily: "-apple-system",
       background: "#F2F2F7",
       minHeight: "100vh",
-      padding: 20
+      padding: 20,
+      maxWidth: 500,
+      margin: "auto"
     }}>
 
-      <h1 style={{ fontSize: 30, fontWeight: 700 }}>🍽️ HC Vision</h1>
+      {/* HEADER */}
+      <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+        <div style={{
+          width: 45,
+          height: 45,
+          borderRadius: 14,
+          background: "linear-gradient(135deg,#007AFF,#5AC8FA)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          color: "white",
+          fontSize: 22
+        }}>
+          💉
+        </div>
 
-      {/* selector comidas */}
-      <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
+        <h1 style={{ fontSize: 28 }}>GlucoMate</h1>
+      </div>
+
+      {/* RATIO */}
+      <div style={{ marginTop: 20 }}>
+        <p>Ratio insulina</p>
+        <input
+          value={ratio}
+          onChange={e => setRatio(e.target.value)}
+          style={{
+            padding: 10,
+            borderRadius: 12,
+            border: "none",
+            width: "100%"
+          }}
+        />
+      </div>
+
+      {/* SELECTOR */}
+      <div style={{ display: "flex", gap: 8, marginTop: 20 }}>
         {["desayuno","comida","merienda","cena"].map(t => (
           <button
             key={t}
@@ -88,8 +139,7 @@ export default function App() {
               borderRadius: 20,
               border: "none",
               background: meal === t ? "#007AFF" : "#E5E5EA",
-              color: meal === t ? "white" : "black",
-              fontWeight: 500
+              color: meal === t ? "white" : "black"
             }}
           >
             {t}
@@ -97,7 +147,7 @@ export default function App() {
         ))}
       </div>
 
-      {/* botón cámara estilo iPhone */}
+      {/* CÁMARA */}
       <label style={{
         display: "block",
         marginTop: 20,
@@ -107,8 +157,7 @@ export default function App() {
         color: "white",
         textAlign: "center",
         fontWeight: 600,
-        cursor: "pointer",
-        boxShadow: "0 6px 15px rgba(0,0,0,0.2)"
+        cursor: "pointer"
       }}>
         📷 Subir o hacer foto
         <input
@@ -121,7 +170,7 @@ export default function App() {
         />
       </label>
 
-      {/* resultados */}
+      {/* RESULTADOS */}
       <div style={{ marginTop: 20 }}>
         {resultado.map((item, i) => {
           const hc = calcularHC(item.nombre, item.cantidad);
@@ -130,12 +179,12 @@ export default function App() {
           return (
             <div key={i} style={{
               background: "white",
-              borderRadius: 20,
               padding: 15,
+              borderRadius: 20,
               marginBottom: 15,
               boxShadow: "0 4px 12px rgba(0,0,0,0.1)"
             }}>
-              <h3 style={{ marginBottom: 10 }}>{item.nombre}</h3>
+              <h3>{item.nombre}</h3>
 
               <input
                 type="range"
@@ -168,6 +217,33 @@ export default function App() {
           );
         })}
       </div>
+
+      {/* BOTÓN GUARDAR */}
+      {resultado.length > 0 && (
+        <button
+          onClick={guardar}
+          style={{
+            width: "100%",
+            padding: 15,
+            borderRadius: 20,
+            background: "green",
+            color: "white",
+            border: "none"
+          }}
+        >
+          Guardar comida
+        </button>
+      )}
+
+      {/* HISTORIAL */}
+      <h3 style={{ marginTop: 30 }}>📊 Historial</h3>
+
+      {historial.map((h, i) => (
+        <div key={i} style={{ fontSize: 12 }}>
+          {h.tipo} - {h.fecha}
+        </div>
+      ))}
+
     </div>
   );
 }
