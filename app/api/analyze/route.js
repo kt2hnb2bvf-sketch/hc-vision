@@ -8,40 +8,33 @@ export async function POST(req) {
   try {
     const { images } = await req.json();
 
-    if (!images || images.length === 0) {
-      return new Response(JSON.stringify({ items: [] }), { status: 400 });
-    }
-
-    // 🔥 convertir imágenes a formato correcto
     const content = [
       {
         type: "input_text",
         text: `
-Analiza estas imágenes del plato.
+Analiza comida.
 
-Devuelve SOLO JSON:
+Makis:
+- 1 maki = 30-35g
+- 8 makis ≈ 240-280g
 
+Devuelve JSON:
 {
-  "items":[
-    {
-      "name":"alimento",
-      "grams":100,
-      "hc_per_100g":20,
-      "units":{
-        "label":"makis",
-        "grams_per_unit":20,
-        "default_count":5
-      }
-    }
-  ]
+ items:[{
+  name:"",
+  grams:0,
+  hc_per_100g:0,
+  gi:0,
+  units:{
+    label:"",
+    grams_per_unit:0,
+    default_count:0
+  }
+ }]
 }
-
-- No expliques nada
-- No texto fuera del JSON
 `
       },
-
-      ...images.map((img) => ({
+      ...images.map(img => ({
         type: "input_image",
         image_url: img
       }))
@@ -49,30 +42,14 @@ Devuelve SOLO JSON:
 
     const response = await client.responses.create({
       model: "gpt-5.4-nano",
-      input: [
-        {
-          role: "user",
-          content
-        }
-      ],
-      max_output_tokens: 800
+      input: [{ role: "user", content }]
     });
 
     const text = response.output_text;
 
-    let json;
+    return new Response(text);
 
-    try {
-      json = JSON.parse(text);
-    } catch (e) {
-      console.error("JSON ERROR:", text);
-      return new Response(JSON.stringify({ items: [] }));
-    }
-
-    return new Response(JSON.stringify(json));
-
-  } catch (error) {
-    console.error(error);
-    return new Response(JSON.stringify({ items: [] }), { status: 500 });
+  } catch {
+    return new Response(JSON.stringify({ items: [] }));
   }
 }

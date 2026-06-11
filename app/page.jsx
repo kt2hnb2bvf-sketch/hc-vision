@@ -9,7 +9,23 @@ export default function App() {
   const [showPicker, setShowPicker] = useState(false);
   const [loading, setLoading] = useState(false);
 
+  const ratio = 10;
+
   const hc = (g, hc100) => (g * hc100) / 100;
+
+  const getIGAdvice = (gi) => {
+    if (!gi) return "";
+    if (gi >= 70) return "IG alto → prebolo 10–15 min";
+    if (gi >= 56) return "IG medio";
+    return "IG bajo";
+  };
+
+  const getIGColor = (gi) => {
+    if (!gi) return "#ccc";
+    if (gi >= 70) return "#FF3B30";
+    if (gi >= 56) return "#FF9500";
+    return "#34C759";
+  };
 
   const handleFiles = (files) => {
     const arr = Array.from(files).slice(0, 4 - photos.length);
@@ -34,7 +50,7 @@ export default function App() {
 
   return (
     <div style={{
-      fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif",
+      fontFamily: "-apple-system",
       background: "#F2F2F7",
       minHeight: "100vh",
       padding: 16,
@@ -42,19 +58,13 @@ export default function App() {
     }}>
 
       {/* HEADER */}
-      <div style={{
-        display: "flex",
-        justifyContent: "space-between",
-        marginBottom: 16
-      }}>
-        <h2 style={{ margin: 0 }}>GlucoMate</h2>
-
+      <div style={{ display: "flex", justifyContent: "space-between" }}>
+        <h2>GlucoMate</h2>
         <div style={{
           background: "#1D9E75",
           color: "white",
           padding: "6px 12px",
-          borderRadius: 20,
-          fontSize: 12
+          borderRadius: 20
         }}>
           -- mg/dL
         </div>
@@ -65,68 +75,37 @@ export default function App() {
         background: "white",
         borderRadius: 14,
         padding: 16,
-        border: "0.5px solid rgba(60,60,67,0.18)",
-        marginBottom: 12
+        border: "0.5px solid rgba(60,60,67,0.18)"
       }}>
 
-        <p style={{ fontSize: 12, color: "rgba(60,60,67,0.6)" }}>
-          FOTO DEL PLATO
-        </p>
+        <p style={{ fontSize: 12, color: "gray" }}>FOTO DEL PLATO</p>
 
         <div
           onClick={() => setShowPicker(true)}
           style={{
-            border: "1px dashed rgba(60,60,67,0.3)",
+            border: "1px dashed gray",
             borderRadius: 12,
             height: 140,
             display: "flex",
-            flexDirection: "column",
             alignItems: "center",
-            justifyContent: "center"
+            justifyContent: "center",
+            flexDirection: "column"
           }}
         >
-          <div style={{ fontSize: 26 }}>📷</div>
+          <img src="https://cdn-icons-png.flaticon.com/512/747/747376.png" width={30} />
           <p>Añade foto del plato</p>
         </div>
 
         {/* MINIATURAS */}
-        <div style={{
-          display: "flex",
-          gap: 8,
-          marginTop: 10
-        }}>
+        <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
           {photos.map((p, i) => (
-            <div key={i} style={{
-              width: 72,
-              height: 72,
-              borderRadius: 10,
-              overflow: "hidden",
-              position: "relative"
-            }}>
-              <img src={p.preview} style={{
-                width: "100%",
-                height: "100%",
-                objectFit: "cover"
-              }} />
-
-              <button
-                onClick={() => {
-                  const copy = [...photos];
-                  copy.splice(i, 1);
-                  setPhotos(copy);
-                }}
-                style={{
-                  position: "absolute",
-                  top: 2,
-                  right: 2,
-                  background: "black",
-                  color: "white",
-                  borderRadius: "50%",
-                  width: 18,
-                  height: 18,
-                  fontSize: 10
-                }}
-              >×</button>
+            <div key={i} style={{ width: 72, height: 72, borderRadius: 10, overflow: "hidden", position: "relative" }}>
+              <img src={p.preview} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+              <button onClick={() => {
+                const copy = [...photos];
+                copy.splice(i, 1);
+                setPhotos(copy);
+              }}>×</button>
             </div>
           ))}
 
@@ -136,7 +115,7 @@ export default function App() {
         </div>
       </div>
 
-      {/* ANALIZAR */}
+      {/* BOTÓN */}
       <button
         disabled={!photos.length}
         onClick={async () => {
@@ -164,10 +143,11 @@ export default function App() {
         }}
         style={{
           width: "100%",
-          height: 50,
-          borderRadius: 12,
-          background: photos.length ? "#1D9E75" : "#E5E5EA",
-          color: "white"
+          height: 54,
+          borderRadius: 14,
+          background: "#1D9E75",
+          color: "white",
+          marginTop: 12
         }}
       >
         Analizar con IA
@@ -181,19 +161,21 @@ export default function App() {
             ? item.grams
             : item.unitCount * item.units.grams_per_unit;
 
+        const carbs = hc(grams, item.hc_per_100g);
+        const insulin = carbs / ratio;
+
         return (
           <div key={i} style={{
             background: "white",
-            padding: 12,
+            padding: 16,
             borderRadius: 14,
             marginTop: 12
           }}>
 
             <p>{item.name}</p>
 
-            {/* TOGGLE */}
             {item.units && (
-              <div style={{ display: "flex", gap: 6 }}>
+              <div>
                 <button onClick={() => {
                   const copy = [...data];
                   copy[i].mode = "g";
@@ -208,7 +190,6 @@ export default function App() {
               </div>
             )}
 
-            {/* INPUT */}
             {item.mode === "g" ? (
               <input
                 type="number"
@@ -239,13 +220,33 @@ export default function App() {
               </div>
             )}
 
-            <p>HC: {hc(grams, item.hc_per_100g).toFixed(1)}</p>
+            {/* SEMÁFORO */}
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <div style={{
+                width: 10,
+                height: 10,
+                borderRadius: "50%",
+                background: getIGColor(item.gi)
+              }} />
+              <span>HC: {carbs.toFixed(1)} g</span>
+            </div>
+
+            <p>💉 Insulina: {insulin.toFixed(1)} u</p>
+
+            <p style={{ fontSize: 13, color: "gray" }}>
+              {getIGAdvice(item.gi)}
+            </p>
 
           </div>
         );
       })}
 
-      {/* ACTION SHEET */}
+      {/* DISCLAIMER */}
+      <div style={{ fontSize: 12, marginTop: 10, color: "gray" }}>
+        ⚠️ Orientativo — no sustituye prescripción médica
+      </div>
+
+      {/* PICKER */}
       {showPicker && (
         <div style={{
           position: "fixed",
@@ -256,30 +257,15 @@ export default function App() {
         }}>
           <label>
             📷 Cámara
-            <input
-              type="file"
-              accept="image/*"
-              capture="environment"
-              multiple
-              hidden
-              onChange={(e) => handleFiles(e.target.files)}
-            />
+            <input type="file" accept="image/*" capture="environment" multiple hidden onChange={(e) => handleFiles(e.target.files)} />
           </label>
 
           <label>
             🖼️ Galería
-            <input
-              type="file"
-              accept="image/*"
-              multiple
-              hidden
-              onChange={(e) => handleFiles(e.target.files)}
-            />
+            <input type="file" accept="image/*" multiple hidden onChange={(e) => handleFiles(e.target.files)} />
           </label>
 
-          <button onClick={() => setShowPicker(false)}>
-            Cancelar
-          </button>
+          <button onClick={() => setShowPicker(false)}>Cancelar</button>
         </div>
       )}
 
