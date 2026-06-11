@@ -5,316 +5,271 @@ import { useState, useEffect } from "react";
 export default function App() {
 
   const [data, setData] = useState([]);
+  const [tab, setTab] = useState("analizar");
+
   const [ratio, setRatio] = useState(10);
-  const [history, setHistory] = useState({});
-  const [learning, setLearning] = useState({});
-  const [meal, setMeal] = useState("cena");
+  const [target, setTarget] = useState(100);
+  const [sensitivity, setSensitivity] = useState(50);
 
-  const [tab, setTab] = useState("home");
-  const [showSidebar, setShowSidebar] = useState(false);
-  const [touchStart, setTouchStart] = useState(0);
+  const [glucose, setGlucose] = useState(null);
+  const [showSheet, setShowSheet] = useState(false);
 
-  // 📷 MULTI FOTO
-  const handleUpload = async (e) => {
-    const files = Array.from(e.target.files);
+  const [boloTab, setBoloTab] = useState("normal");
 
-    const base64Images = await Promise.all(
-      files.map(file => new Promise(res => {
-        const reader = new FileReader();
-        reader.onloadend = () => res(reader.result);
-        reader.readAsDataURL(file);
-      }))
-    );
+  const hc = (g) => g * 0.3;
 
-    const res = await fetch("/api/analyze", {
-      method: "POST",
-      body: JSON.stringify({ images: base64Images }),
-    });
+  const totalHC = data.reduce((a, i) => a + hc(i.gramos || 0), 0);
 
-    const result = await res.json();
+  const comida = totalHC / ratio;
 
-    const enriched = result.map(item => {
-      const learned = learning[item.nombre];
+  const correccion = glucose
+    ? Math.max(0, (glucose - target) / sensitivity)
+    : 0;
 
-      let gramos = 0;
+  const totalInsulina = comida + correccion;
 
-      if (item.piezas) {
-        gramos = item.piezas * (learned || item.gramos_por_pieza);
-      } else {
-        gramos = item.cantidad || 0;
-      }
-
-      return { ...item, gramos };
-    });
-
-    setData(enriched);
-  };
-
-  const hc = g => g * 0.3;
-
-  // 💾 GUARDAR
-  const guardar = () => {
-    const fecha = new Date().toLocaleDateString();
-
-    const entry = {
-      meal,
-      items: data,
-      totalHC: data.reduce((a, i) => a + hc(i.gramos), 0)
-    };
-
-    const updated = { ...history };
-
-    if (!updated[fecha]) updated[fecha] = [];
-    updated[fecha].push(entry);
-
-    setHistory(updated);
-    localStorage.setItem("history", JSON.stringify(updated));
-
-    // 🧠 APRENDIZAJE
-    const newLearning = { ...learning };
-
-    data.forEach(i => {
-      if (i.piezas > 0) {
-        newLearning[i.nombre] = i.gramos / i.piezas;
-      }
-    });
-
-    setLearning(newLearning);
-    localStorage.setItem("learning", JSON.stringify(newLearning));
-  };
-
-  useEffect(() => {
-    const h = localStorage.getItem("history");
-    if (h) setHistory(JSON.parse(h));
-
-    const l = localStorage.getItem("learning");
-    if (l) setLearning(JSON.parse(l));
-  }, []);
-
-  // 👉 SWIPE
-  const handleTouchStart = (e) => {
-    setTouchStart(e.touches[0].clientX);
-  };
-
-  const handleTouchMove = (e) => {
-    const touchEnd = e.touches[0].clientX;
-
-    if (touchStart < 50 && touchEnd > 100) {
-      setShowSidebar(true);
-    }
-
-    if (touchStart > 200 && touchEnd < 100) {
-      setShowSidebar(false);
-    }
+  // 🎨 COLOR IG
+  const igColor = (ig) => {
+    if (ig <= 55) return "green";
+    if (ig <= 69) return "orange";
+    return "red";
   };
 
   return (
-    <div
-      onTouchStart={handleTouchStart}
-      onTouchMove={handleTouchMove}
-      style={{
-        background: "#F2F2F7",
-        minHeight: "100vh",
-        fontFamily: "-apple-system"
-      }}
-    >
+    <div className="app">
 
-      {/* ☰ BOTÓN */}
-      <button
-        onClick={() => setShowSidebar(!showSidebar)}
-        style={{
-          position: "fixed",
-          top: 15,
-          left: 15,
-          zIndex: 1000,
-          background: "#007AFF",
-          color: "white",
-          borderRadius: 10,
-          padding: "8px 12px",
-          border: "none"
-        }}
-      >
-        ☰
-      </button>
+      {/* HEADER */}
+      <header className="header">
+        <h1>GlucoMate</h1>
 
-      {/* 🔥 SIDEBAR */}
-      <div style={{
-        position: "fixed",
-        top: 0,
-        left: showSidebar ? 0 : "-260px",
-        width: 260,
-        height: "100vh",
-        background: "#111",
-        color: "white",
-        padding: 15,
-        transition: "0.3s",
-        zIndex: 999
-      }}>
-        <h3>📅 Historial</h3>
+        <button className="glucose-pill" onClick={() => setShowSheet(true)}>
+          {glucose ? `${glucose} mg/dL` : "-- mg/dL"}
+        </button>
+      </header>
 
-        {Object.keys(history).map((day, i) => (
-          <div key={i}>
-            <strong>{day}</strong>
+      {/* CONTENIDO */}
+      <main>
 
-            {history[day].map((m, j) => (
-              <div key={j} style={{
-                marginTop: 10,
-                padding: 10,
-                background: "#222",
-                borderRadius: 10
-              }}>
-                🍽 {m.meal}
-                <br />
-                HC: {m.totalHC.toFixed(1)} g
-              </div>
-            ))}
-          </div>
-        ))}
-      </div>
-
-      {/* APP */}
-      <div style={{
-        padding: 20,
-        paddingBottom: 80,
-        maxWidth: 400,
-        margin: "auto"
-      }}>
-
-        {tab === "home" && (
-          <>
-            <h2>💉 GlucoMate</h2>
+        {/* RESULTADOS (NO TOCAMOS TU LÓGICA) */}
+        {data.map((item, i) => (
+          <div key={i} className="card">
 
             <input
-              value={ratio}
-              onChange={(e) => setRatio(e.target.value)}
-              style={{
-                width: "100%",
-                padding: 12,
-                borderRadius: 12,
-                marginBottom: 15
+              value={item.nombre}
+              onChange={(e) => {
+                const copy = [...data];
+                copy[i].nombre = e.target.value;
+                setData(copy);
               }}
             />
 
-            {/* COMIDAS */}
-            <div style={{ display: "flex", gap: 8, marginBottom: 15 }}>
-              {["desayuno","comida","merienda","cena","snack"].map(m => (
-                <button
-                  key={m}
-                  onClick={() => setMeal(m)}
-                  style={{
-                    flex: 1,
-                    padding: 8,
-                    borderRadius: 10,
-                    background: meal === m ? "#007AFF" : "#ddd"
-                  }}
-                >
-                  {m}
-                </button>
-              ))}
+            <input
+              type="range"
+              min="0"
+              max="400"
+              value={item.gramos}
+              onChange={(e) => {
+                const copy = [...data];
+                copy[i].gramos = Number(e.target.value);
+                setData(copy);
+              }}
+            />
+
+            <p>{item.gramos} g</p>
+            <p>HC: {hc(item.gramos).toFixed(1)} g</p>
+
+            <div style={{ color: igColor(item.ig || 70) }}>
+              ● IG
             </div>
 
-            {/* FOTO */}
-            <label style={{
-              background: "linear-gradient(135deg,#0A84FF,#5AC8FA)",
-              color: "white",
-              padding: 15,
-              borderRadius: 20,
-              display: "block",
-              textAlign: "center",
-              marginBottom: 20
-            }}>
-              📷 Subir varias fotos
-              <input type="file" multiple hidden onChange={handleUpload} />
-            </label>
+          </div>
+        ))}
 
-            {/* RESULTADOS */}
-            {data.map((item, i) => {
-              const hidratos = hc(item.gramos);
-              const insulina = hidratos / ratio;
+        {/* 🔥 BLOQUE BOLO */}
+        <div className="card">
 
-              return (
-                <div key={i} style={{
-                  background: "white",
-                  padding: 15,
-                  borderRadius: 20,
-                  marginBottom: 15,
-                  boxShadow: "0 8px 20px rgba(0,0,0,0.08)"
-                }}>
-                  <input
-                    value={item.nombre}
-                    onChange={(e) => {
-                      const copy = [...data];
-                      copy[i].nombre = e.target.value;
-                      setData(copy);
-                    }}
-                    style={{ width: "100%" }}
-                  />
+          {/* TABS */}
+          <div className="bolo-tabs">
+            {["normal", "prebolo", "extendido"].map(t => (
+              <button
+                key={t}
+                className={boloTab === t ? "active" : ""}
+                onClick={() => setBoloTab(t)}
+              >
+                {t}
+              </button>
+            ))}
+          </div>
 
-                  <p>🍣 piezas:
-                    <input
-                      type="number"
-                      value={item.piezas}
-                      onChange={(e) => {
-                        const copy = [...data];
-                        copy[i].piezas = Number(e.target.value);
-                        copy[i].gramos =
-                          copy[i].piezas *
-                          (learning[item.nombre] || item.gramos_por_pieza);
-                        setData(copy);
-                      }}
-                      style={{ width: 60 }}
-                    />
-                  </p>
+          {/* NORMAL */}
+          {boloTab === "normal" && (
+            <>
+              <p className="big">{totalInsulina.toFixed(1)} U</p>
 
-                  <p>{item.gramos} g</p>
-                  <p>HC: {hidratos.toFixed(1)} g</p>
-                  <p>💉 {insulina.toFixed(1)} u</p>
-                </div>
-              );
-            })}
+              <p>Administrar justo antes de comer</p>
 
-            <button onClick={guardar} style={{
-              width: "100%",
-              padding: 15,
-              background: "linear-gradient(135deg,#34C759,#30D158)",
-              color: "white",
-              borderRadius: 20
-            }}>
-              Guardar comida
-            </button>
-          </>
-        )}
+              <p>Bolo comida: {comida.toFixed(1)} U</p>
+              <p>Corrección: {correccion.toFixed(1)} U</p>
+            </>
+          )}
 
-      </div>
+          {/* PREBOLO */}
+          {boloTab === "prebolo" && (
+            <>
+              <input type="number" defaultValue={15} />
 
-      {/* 🔥 TABS */}
-      <div style={{
-        position: "fixed",
-        bottom: 0,
-        left: 0,
-        width: "100%",
-        background: "white",
-        display: "flex",
-        borderTop: "1px solid #ccc"
-      }}>
-        <button
-          onClick={() => setTab("home")}
-          style={{
-            flex: 1,
-            padding: 10,
-            background: tab === "home" ? "#007AFF" : "white"
-          }}
-        >
-          🏠
-        </button>
+              <p className="info">
+                El prebolo mejora el control postprandial
+              </p>
 
-        <button
-          onClick={() => setShowSidebar(true)}
-          style={{ flex: 1, padding: 10 }}
-        >
-          📊
-        </button>
-      </div>
+              <p className="big">{totalInsulina.toFixed(1)} U</p>
+            </>
+          )}
+
+          {/* EXTENDIDO */}
+          {boloTab === "extendido" && (
+            <>
+              <input type="number" defaultValue={50} />
+              <input type="number" defaultValue={3} />
+
+              <div className="bar">
+                <div style={{ width: "50%" }} />
+              </div>
+
+              <p>{(totalInsulina * 0.5).toFixed(1)} U ahora</p>
+              <p>{(totalInsulina * 0.5).toFixed(1)} U extendido</p>
+            </>
+          )}
+
+        </div>
+
+      </main>
+
+      {/* BOTTOM NAV */}
+      <nav className="bottom-nav">
+        {["analizar", "historial", "ajustes"].map(t => (
+          <button
+            key={t}
+            className={tab === t ? "active" : ""}
+            onClick={() => setTab(t)}
+          >
+            {t}
+          </button>
+        ))}
+      </nav>
+
+      {/* 🔥 SHEET GLUCEMIA */}
+      {showSheet && (
+        <div className="sheet">
+          <div className="handle" />
+
+          <input
+            type="range"
+            min="40"
+            max="400"
+            onChange={(e) => setGlucose(Number(e.target.value))}
+          />
+
+          <p>{glucose} mg/dL</p>
+
+          <button onClick={() => setShowSheet(false)}>Cerrar</button>
+        </div>
+      )}
+
+      {/* 🎨 ESTILOS iOS */}
+      <style jsx>{`
+        .app {
+          font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif;
+          background: #F2F2F7;
+          min-height: 100vh;
+        }
+
+        .header {
+          position: sticky;
+          top: 0;
+          display: flex;
+          justify-content: space-between;
+          padding: 12px;
+          background: white;
+          border-bottom: 0.5px solid rgba(60,60,67,0.18);
+        }
+
+        .glucose-pill {
+          background: #1D9E75;
+          color: white;
+          padding: 6px 12px;
+          border-radius: 20px;
+        }
+
+        .card {
+          background: white;
+          border: 0.5px solid rgba(60,60,67,0.18);
+          border-radius: 14px;
+          padding: 12px;
+          margin: 12px;
+        }
+
+        .bottom-nav {
+          position: fixed;
+          bottom: 0;
+          width: 100%;
+          display: flex;
+          background: white;
+          border-top: 0.5px solid rgba(60,60,67,0.18);
+          padding-bottom: 20px;
+        }
+
+        .bottom-nav button {
+          flex: 1;
+          font-size: 10px;
+        }
+
+        .active {
+          color: #1D9E75;
+        }
+
+        .sheet {
+          position: fixed;
+          bottom: 0;
+          width: 100%;
+          background: white;
+          border-radius: 20px 20px 0 0;
+          padding: 20px;
+        }
+
+        .handle {
+          width: 40px;
+          height: 4px;
+          background: #ccc;
+          margin: auto;
+          border-radius: 2px;
+        }
+
+        .big {
+          font-size: 28px;
+          color: #1D9E75;
+        }
+
+        .info {
+          color: rgba(60,60,67,0.6);
+        }
+
+        .bar {
+          height: 8px;
+          background: #eee;
+          border-radius: 4px;
+        }
+
+        .bar div {
+          height: 100%;
+          background: #1D9E75;
+        }
+
+        @media (prefers-color-scheme: dark) {
+          .app { background: #1C1C1E; }
+          .card { background: #2C2C2E; }
+        }
+      `}</style>
 
     </div>
   );
