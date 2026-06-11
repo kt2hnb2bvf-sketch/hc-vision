@@ -60,7 +60,7 @@ export default function App() {
         </div>
       </div>
 
-      {/* FOTO CARD */}
+      {/* FOTO */}
       <div style={{
         background: "white",
         borderRadius: 14,
@@ -69,10 +69,7 @@ export default function App() {
         marginBottom: 12
       }}>
 
-        <p style={{
-          fontSize: 12,
-          color: "rgba(60,60,67,0.6)"
-        }}>
+        <p style={{ fontSize: 12, color: "rgba(60,60,67,0.6)" }}>
           FOTO DEL PLATO
         </p>
 
@@ -85,23 +82,18 @@ export default function App() {
             display: "flex",
             flexDirection: "column",
             alignItems: "center",
-            justifyContent: "center",
-            cursor: "pointer"
+            justifyContent: "center"
           }}
         >
           <div style={{ fontSize: 26 }}>📷</div>
           <p>Añade foto del plato</p>
-          <p style={{ fontSize: 12, color: "gray" }}>
-            Pulsa o arrastra una imagen
-          </p>
         </div>
 
         {/* MINIATURAS */}
         <div style={{
           display: "flex",
           gap: 8,
-          marginTop: 10,
-          overflowX: "auto"
+          marginTop: 10
         }}>
           {photos.map((p, i) => (
             <div key={i} style={{
@@ -135,20 +127,6 @@ export default function App() {
                   fontSize: 10
                 }}
               >×</button>
-
-              {loading && (
-                <div style={{
-                  position: "absolute",
-                  inset: 0,
-                  background: "rgba(0,0,0,0.4)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  color: "white"
-                }}>
-                  ⏳
-                </div>
-              )}
             </div>
           ))}
 
@@ -156,13 +134,9 @@ export default function App() {
             <button onClick={() => setShowPicker(true)}>+</button>
           )}
         </div>
-
-        <p style={{ fontSize: 12, color: "gray" }}>
-          Varias fotos mejoran la precisión
-        </p>
       </div>
 
-      {/* BOTÓN ANALIZAR */}
+      {/* ANALIZAR */}
       <button
         disabled={!photos.length}
         onClick={async () => {
@@ -178,7 +152,13 @@ export default function App() {
 
           const json = await res.json();
 
-          setData(json.items || []);
+          const enriched = (json.items || []).map(item => ({
+            ...item,
+            mode: "g",
+            unitCount: item.units?.default_count || 1
+          }));
+
+          setData(enriched);
           setLoading(false);
 
         }}
@@ -186,48 +166,84 @@ export default function App() {
           width: "100%",
           height: 50,
           borderRadius: 12,
-          border: "0.5px solid rgba(60,60,67,0.18)",
           background: photos.length ? "#1D9E75" : "#E5E5EA",
-          color: photos.length ? "white" : "gray",
-          fontSize: 16,
-          marginBottom: 12
+          color: "white"
         }}
       >
-        {photos.length > 1
-          ? `✨ Analizar ${photos.length} fotos`
-          : "✨ Analizar con IA"}
+        Analizar con IA
       </button>
 
       {/* RESULTADOS */}
-      {data.map((item, i) => (
-        <div key={i} style={{
-          background: "white",
-          padding: 12,
-          borderRadius: 14,
-          marginBottom: 10
-        }}>
-          <p>{item.name}</p>
-          <p>{item.grams} g</p>
-          <p>HC: {hc(item.grams, item.hc_per_100g).toFixed(1)}</p>
-        </div>
-      ))}
+      {data.map((item, i) => {
 
-      {/* BOTTOM NAV */}
-      <div style={{
-        position: "fixed",
-        bottom: 0,
-        left: 0,
-        right: 0,
-        background: "white",
-        borderTop: "0.5px solid rgba(60,60,67,0.18)",
-        display: "flex",
-        justifyContent: "space-around",
-        padding: "8px 0"
-      }}>
-        <Tab label="Analizar" active />
-        <Tab label="Historial" />
-        <Tab label="Ajustes" />
-      </div>
+        const grams =
+          item.mode === "g"
+            ? item.grams
+            : item.unitCount * item.units.grams_per_unit;
+
+        return (
+          <div key={i} style={{
+            background: "white",
+            padding: 12,
+            borderRadius: 14,
+            marginTop: 12
+          }}>
+
+            <p>{item.name}</p>
+
+            {/* TOGGLE */}
+            {item.units && (
+              <div style={{ display: "flex", gap: 6 }}>
+                <button onClick={() => {
+                  const copy = [...data];
+                  copy[i].mode = "g";
+                  setData(copy);
+                }}>g</button>
+
+                <button onClick={() => {
+                  const copy = [...data];
+                  copy[i].mode = "uds";
+                  setData(copy);
+                }}>uds</button>
+              </div>
+            )}
+
+            {/* INPUT */}
+            {item.mode === "g" ? (
+              <input
+                type="number"
+                value={item.grams}
+                onChange={(e) => {
+                  const copy = [...data];
+                  copy[i].grams = Number(e.target.value);
+                  setData(copy);
+                }}
+              />
+            ) : (
+              <div>
+                <button onClick={() => {
+                  const copy = [...data];
+                  copy[i].unitCount--;
+                  setData(copy);
+                }}>-</button>
+
+                {item.unitCount} {item.units.label}
+
+                <button onClick={() => {
+                  const copy = [...data];
+                  copy[i].unitCount++;
+                  setData(copy);
+                }}>+</button>
+
+                <p>≈ {grams} g</p>
+              </div>
+            )}
+
+            <p>HC: {hc(grams, item.hc_per_100g).toFixed(1)}</p>
+
+          </div>
+        );
+      })}
 
       {/* ACTION SHEET */}
       {showPicker && (
@@ -236,11 +252,10 @@ export default function App() {
           bottom: 0,
           width: "100%",
           background: "white",
-          padding: 20,
-          borderRadius: "20px 20px 0 0"
+          padding: 20
         }}>
           <label>
-            📷 Tomar foto
+            📷 Cámara
             <input
               type="file"
               accept="image/*"
@@ -268,17 +283,6 @@ export default function App() {
         </div>
       )}
 
-    </div>
-  );
-}
-
-function Tab({ label, active }) {
-  return (
-    <div style={{
-      fontSize: 10,
-      color: active ? "#1D9E75" : "gray"
-    }}>
-      {label}
     </div>
   );
 }

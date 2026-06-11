@@ -13,7 +13,7 @@ export async function POST(req) {
 
     content.push({
       type: "text",
-      text: "Analiza estas fotos del plato y devuelve alimentos con gramos y HC"
+      text: "Devuelve alimentos con gramos, hc_per_100g y units"
     });
 
     const response = await fetch("https://api.anthropic.com/v1/messages", {
@@ -37,7 +37,7 @@ export async function POST(req) {
 
     return new Response(text);
 
-  } catch (e) {
+  } catch {
     return new Response(JSON.stringify({ error: "error IA" }), { status: 500 });
   }
 }
